@@ -1,0 +1,2 @@
+MongoDB connected: mongodb://127.0.0.1:27017/dealflow360
+DealFlow360 API listening on port 5000

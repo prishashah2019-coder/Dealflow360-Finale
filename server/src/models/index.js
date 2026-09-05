@@ -1,0 +1,17 @@
+module.exports = {
+  User: require('./User'),
+  Customer: require('./Customer'),
+  Product: require('./Product'),
+  Warehouse: require('./Warehouse'),
+  Stock: require('./Stock'),
+  PriceList: require('./PriceList'),
+  DiscountConfig: require('./DiscountConfig'),
+  SubscriptionPlan: require('./SubscriptionPlan'),
+  UpsellRule: require('./UpsellRule'),
+  Quotation: require('./Quotation'),
+  Subscription: require('./Subscription'),
+  Invoice: require('./Invoice'),
+  Payment: require('./Payment'),
+  CreditNote: require('./CreditNote'),
+  AuditLog: require('./AuditLog'),
+};
