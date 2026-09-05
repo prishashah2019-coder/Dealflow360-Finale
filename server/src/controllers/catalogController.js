@@ -1,6 +1,7 @@
-const { Product, Warehouse, Stock, PriceList, DiscountConfig, SubscriptionPlan, UpsellRule, Customer, User } = require('../models');
+const bcrypt = require('bcryptjs');
+const { Product, Warehouse, Stock, PriceList, DiscountConfig, SubscriptionPlan, UpsellRule, Customer, User, AuditLog } = require('../models');
 
-// Customers (read-only here; sign-up happens via /api/auth/customer routes in a later iteration)
+// Customers (read-only here; sign-up happens via /api/auth/customer routes)
 async function listCustomers(req, res) {
   res.json(await Customer.find().select('-passwordHash').sort({ name: 1 }));
 }
@@ -8,6 +9,47 @@ async function listCustomers(req, res) {
 // Internal users (for the Reports "Sales Team" filter, etc.)
 async function listUsers(req, res) {
   res.json(await User.find().select('name role email').sort({ name: 1 }));
+}
+
+// Admin-only: provision an internal user at any role (sales_manager,
+// finance, admin). Public self-signup (POST /api/auth/signup) can only
+// ever create a sales_rep - this is the one path allowed to set a higher role.
+async function createUser(req, res) {
+  const { name, email, password, role } = req.body;
+  const allowedRoles = ['sales_rep', 'sales_manager', 'finance', 'admin'];
+  if (!name || !email || !password || !allowedRoles.includes(role)) {
+    return res.status(400).json({ error: `name, email, password, and role (one of ${allowedRoles.join(', ')}) are required` });
+  }
+  const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing) return res.status(409).json({ error: 'Email already registered' });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await User.create({ name, email, passwordHash, role });
+  res.status(201).json({ id: user._id, name: user.name, email: user.email, role: user.role });
+}
+
+// Admin-only: platform-wide audit trail - every approval decision, edit,
+// nudge, escalation, etc. across every quotation, with who/when/why. The
+// problem statement requires these be logged; this is where an Admin
+// actually reviews that log instead of it only being visible per-quotation.
+async function listAuditLog(req, res) {
+  const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(200);
+  const userIds = [...new Set(logs.map((l) => String(l.userId)).filter(Boolean))];
+  const users = await User.find({ _id: { $in: userIds } }).select('name role');
+  const userById = new Map(users.map((u) => [String(u._id), u]));
+  res.json(logs.map((l) => {
+    const u = userById.get(String(l.userId));
+    return {
+      _id: l._id,
+      entityType: l.entityType,
+      entityId: l.entityId,
+      action: l.action,
+      reason: l.reason,
+      timestamp: l.timestamp,
+      user: u?.name || 'System',
+      role: u?.role || '—',
+    };
+  }));
 }
 
 // Products
@@ -116,7 +158,7 @@ async function getUpsellForProduct(req, res) {
 }
 
 module.exports = {
-  listCustomers, listUsers,
+  listCustomers, listUsers, createUser, listAuditLog,
   listProducts, createProduct, getProduct, updateProduct,
   listWarehouses, createWarehouse,
   listStocks, upsertStock,

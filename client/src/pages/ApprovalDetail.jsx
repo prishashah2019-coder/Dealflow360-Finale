@@ -5,6 +5,7 @@ import DataTable from '../components/DataTable.jsx'
 import StepTracker from '../components/StepTracker.jsx'
 import { getQuotation } from '../api/quotations.js'
 import { decideApproval } from '../api/approvals.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { mockApprovalDetail } from '../mockData.js'
 
 function buildSteps(approvals = []) {
@@ -31,9 +32,11 @@ function buildSteps(approvals = []) {
 export default function ApprovalDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [detail, setDetail] = useState(null)
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
+  const [actionMsg, setActionMsg] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -54,15 +57,22 @@ export default function ApprovalDetail() {
 
   const approvals = detail.approvals || []
   const currentStep = approvals.find((a) => a.status === 'pending')
+  // Only the role the current step actually requires (or an Admin, as a
+  // break-glass override) can act - matches the server-side check exactly,
+  // so the UI doesn't invite a click that's just going to 403.
+  const canDecide = !!currentStep && (user?.role === currentStep.approverRole || user?.role === 'admin')
 
   const handleDecision = async (action) => {
     setBusy(true)
+    setActionMsg('')
     try {
-      await decideApproval(id, currentStep?._id || 'step1', action, comment)
+      await decideApproval(id, currentStep?._id, action, comment)
       navigate('/approvals')
     } catch (err) {
-      console.warn('Decide-approval API unavailable (demo mode).', err?.message)
-      navigate('/approvals')
+      // Only leave the page on real success - this previously navigated away
+      // even when the backend rejected the request (e.g. wrong role, or no
+      // pending step), which looked like the decision had gone through.
+      setActionMsg(err?.response?.data?.error || 'Could not record this decision.')
     } finally {
       setBusy(false)
     }
@@ -98,11 +108,21 @@ export default function ApprovalDetail() {
           </div>
         </div>
         <div className="page-actions">
-          <button className="btn btn-success" disabled={busy} onClick={() => handleDecision('approve')}>Approve</button>
-          <button className="btn btn-warn" disabled={busy} onClick={() => handleDecision('return')}>Return for Revision</button>
-          <button className="btn btn-danger" disabled={busy} onClick={() => handleDecision('reject')}>Reject</button>
+          {canDecide ? (
+            <>
+              <button className="btn btn-success" disabled={busy} onClick={() => handleDecision('approve')}>Approve</button>
+              <button className="btn btn-warn" disabled={busy} onClick={() => handleDecision('return')}>Return for Revision</button>
+              <button className="btn btn-danger" disabled={busy} onClick={() => handleDecision('reject')}>Reject</button>
+            </>
+          ) : (
+            <span className="muted" style={{ fontSize: 13, alignSelf: 'center' }}>
+              {currentStep ? `Waiting on ${currentStep.approverRole.replace('_', ' ')}` : 'No pending decision on this quote'}
+            </span>
+          )}
         </div>
       </div>
+
+      {actionMsg && <div className="error-text">{actionMsg}</div>}
 
       <div className="card">
         <StepTracker steps={buildSteps(approvals)} />

@@ -21,6 +21,10 @@ import ProductCatalog from './pages/ProductCatalog.jsx'
 import ProductDetail from './pages/ProductDetail.jsx'
 import DiscountConfig from './pages/DiscountConfig.jsx'
 import PortalNegotiation from './pages/PortalNegotiation.jsx'
+import PortalHome from './pages/PortalHome.jsx'
+import WarehouseManagement from './pages/WarehouseManagement.jsx'
+import AuditLog from './pages/AuditLog.jsx'
+import CreditNotes from './pages/CreditNotes.jsx'
 
 function withLayout(Component, props = {}) {
   return (
@@ -39,7 +43,7 @@ export default function App() {
         path="/login"
         element={
           isAuthenticated
-            ? <Navigate to={isCustomer ? '/portal/quotations/me' : '/dashboard'} replace />
+            ? <Navigate to={isCustomer ? '/portal' : '/dashboard'} replace />
             : <Login />
         }
       />
@@ -69,12 +73,32 @@ export default function App() {
 
       <Route
         path="/admin/discount-config"
-        element={<ProtectedRoute adminOnly>{withLayout(DiscountConfig)}</ProtectedRoute>}
+        element={<ProtectedRoute allowRoles={['admin', 'sales_manager']}>{withLayout(DiscountConfig)}</ProtectedRoute>}
+      />
+      <Route
+        path="/admin/warehouses"
+        element={<ProtectedRoute adminOnly>{withLayout(WarehouseManagement)}</ProtectedRoute>}
+      />
+      <Route
+        path="/admin/audit-log"
+        element={<ProtectedRoute adminOnly>{withLayout(AuditLog)}</ProtectedRoute>}
+      />
+      <Route
+        path="/credit-notes"
+        element={<ProtectedRoute allowRoles={['finance', 'admin']}>{withLayout(CreditNotes)}</ProtectedRoute>}
       />
 
       {/* Customer portal: separate, restricted, customer-only. No top nav.
           Internal users are bounced to the dashboard rather than being able
-          to view a customer's negotiation screen. */}
+          to view a customer's quotations. */}
+      <Route
+        path="/portal"
+        element={
+          !isAuthenticated ? <Navigate to="/login" replace />
+          : !isCustomer ? <Navigate to="/dashboard" replace />
+          : <PortalHome />
+        }
+      />
       <Route
         path="/portal/quotations/:id"
         element={
@@ -84,7 +108,7 @@ export default function App() {
         }
       />
 
-      <Route path="/" element={<Navigate to={isAuthenticated ? (isCustomer ? '/portal/quotations/me' : '/dashboard') : '/login'} replace />} />
+      <Route path="/" element={<Navigate to={isAuthenticated ? (isCustomer ? '/portal' : '/dashboard') : '/login'} replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

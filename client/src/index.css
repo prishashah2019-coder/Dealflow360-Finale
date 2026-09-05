@@ -56,8 +56,7 @@ body {
   font-family: var(--font-body);
   font-size: 1rem;
   color: var(--text);
-  background:
-    linear-gradient(160deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
+  background: linear-gradient(160deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
   background-attachment: fixed;
   min-height: 100vh;
   position: relative;
@@ -66,6 +65,18 @@ body {
 #root {
   position: relative;
   z-index: 1;
+}
+
+/* Soft vignette shadow toward the screen edges - no visible border line or
+   pattern, just a darkening at the very edges of the viewport, fixed so it
+   never scrolls with content. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  box-shadow: inset 0 0 140px 30px rgba(20, 14, 8, 0.4);
 }
 
 a {
@@ -187,6 +198,7 @@ p {
 
 .page-header .titles h1 {
   font-size: 34px;
+  color: var(--text);
 }
 
 .page-header .titles .subtitle {
@@ -851,6 +863,10 @@ table.data-table tbody tr:last-child td {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  /* Own opaque backdrop so the sitewide dark background image never bleeds
+     through here - the login page keeps its original light look regardless
+     of what the rest of the app's background is doing. */
+  background: linear-gradient(160deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
 }
 
 @media (max-width: 880px) {
@@ -902,6 +918,12 @@ table.data-table tbody tr:last-child td {
 
 .error-text {
   color: var(--red);
+  font-size: 13px;
+  margin: -6px 0 12px;
+}
+
+.success-text {
+  color: var(--green);
   font-size: 13px;
   margin: -6px 0 12px;
 }

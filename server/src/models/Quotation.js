@@ -33,6 +33,7 @@ const negotiationCommentSchema = new mongoose.Schema({
   lineId: { type: mongoose.Schema.Types.ObjectId, default: null },
   commentText: { type: String, default: '' },
   counterDiscountPct: { type: Number, default: null },
+  requestedDeliveryDate: { type: Date, default: null },
 }, { timestamps: true });
 
 const dealHealthAlertSchema = new mongoose.Schema({

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login as loginApi, signup as signupApi, customerLogin as customerLoginApi } from '../api/auth.js'
+import { login as loginApi, signup as signupApi, customerSignup as customerSignupApi, customerLogin as customerLoginApi } from '../api/auth.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const FEATURES = [
@@ -10,9 +10,17 @@ const FEATURES = [
   { icon: '💬', title: 'Customer negotiation portal', text: 'Customers counter-offer directly - terms beyond threshold re-enter approval automatically.' },
 ]
 
+const SIGNUP_ROLES = [
+  { value: 'sales_rep', label: 'Sales Rep' },
+  { value: 'sales_manager', label: 'Sales Manager' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'customer', label: 'Customer' },
+]
+
 export default function Login() {
   const [tab, setTab] = useState('login') // 'login' | 'signup'
-  const [asCustomer, setAsCustomer] = useState(false)
+  const [asCustomer, setAsCustomer] = useState(false) // login tab only
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'sales_rep' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,10 +35,17 @@ export default function Login() {
     setLoading(true)
     try {
       if (tab === 'signup') {
-        const res = await signupApi({ name: form.name, email: form.email, password: form.password, role: form.role })
-        const { token, user } = res.data
-        login(token, user)
-        navigate('/dashboard')
+        if (form.role === 'customer') {
+          const res = await customerSignupApi({ name: form.name, email: form.email, password: form.password })
+          const { token, customer } = res.data
+          login(token, { ...customer, role: 'customer' })
+          navigate('/portal')
+        } else {
+          const res = await signupApi({ name: form.name, email: form.email, password: form.password, role: form.role })
+          const { token, user } = res.data
+          login(token, user)
+          navigate('/dashboard')
+        }
         return
       }
 
@@ -38,7 +53,7 @@ export default function Login() {
         const res = await customerLoginApi({ email: form.email, password: form.password })
         const { token, customer } = res.data
         login(token, { ...customer, role: 'customer' })
-        navigate('/portal/quotations/me')
+        navigate('/portal')
       } else {
         const res = await loginApi({ email: form.email, password: form.password })
         const { token, user } = res.data
@@ -114,19 +129,14 @@ export default function Login() {
                 <input type="password" value={form.password} onChange={update('password')} placeholder="••••••••" required />
               </div>
 
-              {tab === 'signup' && (
+              {tab === 'signup' ? (
                 <div className="form-field">
                   <label>Role</label>
                   <select value={form.role} onChange={update('role')}>
-                    <option value="sales_rep">Sales Rep</option>
-                    <option value="sales_manager">Sales Manager</option>
-                    <option value="finance">Finance</option>
-                    <option value="admin">Admin</option>
+                    {SIGNUP_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
-              )}
-
-              {tab === 'login' && (
+              ) : (
                 <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
@@ -142,14 +152,18 @@ export default function Login() {
               {error && <div className="error-text">{error}</div>}
 
               <button className="btn btn-primary" type="submit" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-                {loading ? 'Please wait…' : tab === 'login' ? 'Log In' : 'Create Account'}
+                {loading
+                  ? 'Please wait…'
+                  : tab === 'login'
+                    ? 'Log In'
+                    : `Create ${SIGNUP_ROLES.find((r) => r.value === form.role)?.label} Account`}
               </button>
             </form>
           </div>
 
           <div className="auth-footnote">
-            Internal users (sales rep, sales manager, finance, admin) land on the Dashboard.
-            Customers land on their Quotation Portal.
+            Pick any role to sign up with, or log in with an existing account.
+            Customers land on their own Quotation Portal; every internal role lands on a dashboard tailored to it.
           </div>
         </div>
       </div>

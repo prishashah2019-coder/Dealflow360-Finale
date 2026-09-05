@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import DataTable from '../components/DataTable.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { getSubscription, modifySubscription, cancelSubscription } from '../api/subscriptions.js'
 import { mockSubscriptionDetail } from '../mockData.js'
 
 export default function SubscriptionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // Finance "reconciles recurring billing" - modifying/cancelling a live
+  // subscription (with its proration/refund side effects) is Finance/Admin only.
+  const canManage = user?.role === 'finance' || user?.role === 'admin'
   const [detail, setDetail] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const [modifyForm, setModifyForm] = useState({ nextBillingDate: '', prorationAmount: '', reason: '' })
+  const [cancelForm, setCancelForm] = useState({ refundAmount: '', reason: '' })
 
   useEffect(() => {
     let cancelled = false
@@ -29,10 +38,16 @@ export default function SubscriptionDetail() {
 
   const handleModify = async () => {
     setBusy(true)
+    setMsg('')
     try {
-      await modifySubscription(id, {})
+      await modifySubscription(id, {
+        nextBillingDate: modifyForm.nextBillingDate || undefined,
+        prorationAmount: modifyForm.prorationAmount ? Number(modifyForm.prorationAmount) : undefined,
+        reason: modifyForm.reason || undefined,
+      })
+      setMsg('Subscription updated.')
     } catch (err) {
-      console.warn('Modify-subscription API unavailable (demo mode).', err?.message)
+      setMsg(err?.response?.data?.error || 'Could not modify this subscription.')
     } finally {
       setBusy(false)
     }
@@ -40,12 +55,16 @@ export default function SubscriptionDetail() {
 
   const handleCancel = async () => {
     setBusy(true)
+    setMsg('')
     try {
-      await cancelSubscription(id)
+      await cancelSubscription(id, {
+        refundAmount: cancelForm.refundAmount ? Number(cancelForm.refundAmount) : undefined,
+        reason: cancelForm.reason || undefined,
+      })
       navigate('/subscriptions')
     } catch (err) {
-      console.warn('Cancel-subscription API unavailable (demo mode).', err?.message)
-      navigate('/subscriptions')
+      // Only leave the page on real success.
+      setMsg(err?.response?.data?.error || 'Could not cancel this subscription.')
     } finally {
       setBusy(false)
     }
@@ -71,11 +90,9 @@ export default function SubscriptionDetail() {
         <div className="titles">
           <h1>Billing — {detail.customer || detail.customerId?.name || 'Customer'}</h1>
         </div>
-        <div className="page-actions">
-          <button className="btn btn-secondary" disabled={busy} onClick={handleModify}>Modify Subscription</button>
-          <button className="btn btn-danger" disabled={busy} onClick={handleCancel}>Cancel Subscription</button>
-        </div>
       </div>
+
+      {msg && <div className="error-text">{msg}</div>}
 
       <div className="card">
         <div className="card-title-row">
@@ -90,6 +107,46 @@ export default function SubscriptionDetail() {
         </div>
         <DataTable columns={recurringColumns} rows={detail.recurringLines || []} emptyMessage="No recurring lines." />
       </div>
+
+      {canManage ? (
+        <>
+          <div className="card">
+            <div className="card-title-row"><h3>Modify Subscription</h3></div>
+            <div className="form-row">
+              <div className="form-field">
+                <label>New Next Billing Date</label>
+                <input type="date" value={modifyForm.nextBillingDate} onChange={(e) => setModifyForm((f) => ({ ...f, nextBillingDate: e.target.value }))} />
+              </div>
+              <div className="form-field">
+                <label>Proration Credit ($)</label>
+                <input type="number" value={modifyForm.prorationAmount} onChange={(e) => setModifyForm((f) => ({ ...f, prorationAmount: e.target.value }))} placeholder="e.g. 15" />
+              </div>
+              <div className="form-field">
+                <label>Reason</label>
+                <input value={modifyForm.reason} onChange={(e) => setModifyForm((f) => ({ ...f, reason: e.target.value }))} placeholder="e.g. mid-cycle plan downgrade" />
+              </div>
+            </div>
+            <button className="btn btn-secondary" disabled={busy} onClick={handleModify}>Modify Subscription</button>
+          </div>
+
+          <div className="card">
+            <div className="card-title-row"><h3>Cancel Subscription</h3></div>
+            <div className="form-row">
+              <div className="form-field">
+                <label>Refund Amount ($, optional)</label>
+                <input type="number" value={cancelForm.refundAmount} onChange={(e) => setCancelForm((f) => ({ ...f, refundAmount: e.target.value }))} placeholder="e.g. 25" />
+              </div>
+              <div className="form-field">
+                <label>Reason</label>
+                <input value={cancelForm.reason} onChange={(e) => setCancelForm((f) => ({ ...f, reason: e.target.value }))} placeholder="e.g. customer requested cancellation" />
+              </div>
+            </div>
+            <button className="btn btn-danger" disabled={busy} onClick={handleCancel}>Cancel Subscription</button>
+          </div>
+        </>
+      ) : (
+        <div className="note-banner">Only Finance/Admin can modify or cancel a subscription.</div>
+      )}
     </div>
   )
 }

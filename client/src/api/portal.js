@@ -1,5 +1,7 @@
 import client from './client'
 
+// GET /api/portal/quotations - list all of the logged-in customer's quotations
+export const listPortalQuotations = () => client.get('/portal/quotations')
 // GET /api/portal/quotations/:id
 export const getPortalQuotation = (id) => client.get(`/portal/quotations/${id}`)
 // POST /api/portal/quotations/:id/comments { lineId, commentText, counterDiscountPct }

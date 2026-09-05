@@ -98,9 +98,9 @@ export const mockApprovalDetail = {
 }
 
 export const mockStocks = [
-  { warehouse: 'North DC', qtyFulfilled: 120, inStock: 340, reserved: 60, available: 280 },
-  { warehouse: 'West Coast Hub', qtyFulfilled: 88, inStock: 210, reserved: 40, available: 170 },
-  { warehouse: 'East Regional', qtyFulfilled: 54, inStock: 150, reserved: 20, available: 130 },
+  { product: 'Industrial Sensor Kit', warehouse: 'North DC', qtyFulfilled: 120, inStock: 340, reserved: 60, available: 280 },
+  { product: 'Bulk Packaging Roll', warehouse: 'West Coast Hub', qtyFulfilled: 88, inStock: 210, reserved: 40, available: 170 },
+  { product: 'Cold Chain Container', warehouse: 'East Regional', qtyFulfilled: 54, inStock: 150, reserved: 20, available: 130 },
 ]
 
 export const mockFulfillmentOrders = [

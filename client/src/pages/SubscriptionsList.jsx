@@ -4,9 +4,12 @@ import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
 import { getSubscriptions } from '../api/subscriptions.js'
 import { createSubscriptionPlan } from '../api/products.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { mockSubscriptions } from '../mockData.js'
 
 export default function SubscriptionsList() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [subs, setSubs] = useState([])
   const [showNewPlan, setShowNewPlan] = useState(false)
   const [newPlan, setNewPlan] = useState({ name: '', billingCycle: 'monthly' })
@@ -27,7 +30,6 @@ export default function SubscriptionsList() {
           nextBill: s.nextBillingDate || s.nextBill,
           status: s.status,
         }))
-        if (mapped.length === 0) throw new Error('empty subscriptions from API, use mock')
         if (!cancelled) setSubs(mapped)
       } catch (err) {
         console.warn('Falling back to mock subscriptions list.', err?.message)
@@ -68,14 +70,16 @@ export default function SubscriptionsList() {
           <h1>Subscriptions</h1>
           <div className="subtitle">Recurring plans across all customers.</div>
         </div>
-        <div className="page-actions">
-          <button className="btn btn-primary" onClick={() => setShowNewPlan((v) => !v)}>
-            {showNewPlan ? 'Cancel' : '+ New Plan (Admin)'}
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="page-actions">
+            <button className="btn btn-primary" onClick={() => setShowNewPlan((v) => !v)}>
+              {showNewPlan ? 'Cancel' : '+ New Plan'}
+            </button>
+          </div>
+        )}
       </div>
 
-      {showNewPlan && (
+      {isAdmin && showNewPlan && (
         <div className="card">
           <div className="card-title-row"><h3>New Subscription Plan</h3></div>
           <form onSubmit={handleCreatePlan}>

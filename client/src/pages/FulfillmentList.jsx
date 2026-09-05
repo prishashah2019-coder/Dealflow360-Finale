@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
 import { getStocks, getWarehouses, getQuotations } from '../api/fulfillment.js'
+import { getProducts } from '../api/products.js'
 import { mockStocks, mockFulfillmentOrders } from '../mockData.js'
 
 export default function FulfillmentList() {
@@ -14,16 +15,20 @@ export default function FulfillmentList() {
     let cancelled = false
     async function load() {
       try {
-        const [stockRes, whRes] = await Promise.all([getStocks(), getWarehouses()])
+        const [stockRes, whRes, prodRes] = await Promise.all([getStocks(), getWarehouses(), getProducts()])
         const warehousesById = Object.fromEntries((whRes.data || []).map((w) => [w._id, w.name]))
+        const productsById = Object.fromEntries((prodRes.data || []).map((p) => [p._id, p.name]))
+        // An empty stocks list is a legitimate state (no stock levels set
+        // yet, e.g. a fresh warehouse) - it must not be swapped for fake
+        // mock rows, which previously hid that nothing had actually loaded.
         const mapped = (stockRes.data || []).map((s) => ({
+          product: productsById[s.productId] || s.productId,
           warehouse: warehousesById[s.warehouseId] || s.warehouseId,
           qtyFulfilled: s.qtyFulfilled ?? 0,
           inStock: s.qtyAvailable,
           reserved: s.reserved ?? 0,
           available: s.qtyAvailable - (s.reserved ?? 0),
         }))
-        if (mapped.length === 0) throw new Error('empty stocks from API, use mock')
         if (!cancelled) setStocks(mapped)
       } catch (err) {
         console.warn('Falling back to mock stock table.', err?.message)
@@ -39,7 +44,6 @@ export default function FulfillmentList() {
           status: q.fulfillmentSplits?.some((s) => s.isBackorder) ? 'backorder' : 'suggested',
           warehouse: q.fulfillmentSplits?.[0]?.warehouseId?.name || '—',
         }))
-        if (mapped.length === 0) throw new Error('empty orders from API, use mock')
         if (!cancelled) setOrders(mapped)
       } catch (err) {
         console.warn('Falling back to mock fulfillment orders.', err?.message)
@@ -51,6 +55,7 @@ export default function FulfillmentList() {
   }, [])
 
   const stockColumns = [
+    { key: 'product', label: 'Product' },
     { key: 'warehouse', label: 'Warehouse' },
     { key: 'qtyFulfilled', label: 'Qty Fulfilled' },
     { key: 'inStock', label: 'In Stock' },

@@ -19,11 +19,28 @@ async function resolveOwnQuotation(customerId, id) {
   return id === 'me' ? cursor.sort({ updatedAt: -1 }) : cursor;
 }
 
+function lineTotal(line) {
+  return Math.round(line.unitPrice * (1 - (line.discountPct || 0) / 100) * line.quantity * 100) / 100;
+}
+
+// Portal home: every quotation this customer can see (never another
+// customer's), with just enough summary info to render a list without a
+// second round trip per row.
 async function listOwnQuotations(req, res) {
   const quotations = await Quotation.find({ customerId: req.auth.sub, status: { $ne: 'Draft' } })
-    .select('_id status blendedRiskScore updatedAt')
+    .select('_id status blendedRiskScore updatedAt createdAt lines')
     .sort({ updatedAt: -1 });
-  res.json(quotations);
+  res.json(
+    quotations.map((q) => ({
+      _id: q._id,
+      status: q.status,
+      blendedRiskScore: q.blendedRiskScore,
+      updatedAt: q.updatedAt,
+      createdAt: q.createdAt,
+      lineCount: q.lines.length,
+      total: q.lines.reduce((sum, l) => sum + lineTotal(l), 0),
+    }))
+  );
 }
 
 async function getOwnQuotation(req, res) {
@@ -36,8 +53,14 @@ async function addComment(req, res) {
   const quotation = await resolveOwnQuotation(req.auth.sub, req.params.id);
   if (!quotation) return res.status(404).json({ error: 'Not found' });
 
-  const { lineId, commentText, counterDiscountPct } = req.body;
-  quotation.negotiationComments.push({ authorType: 'customer', lineId, commentText, counterDiscountPct });
+  const { lineId, commentText, counterDiscountPct, requestedDeliveryDate } = req.body;
+  quotation.negotiationComments.push({
+    authorType: 'customer',
+    lineId,
+    commentText,
+    counterDiscountPct,
+    requestedDeliveryDate: requestedDeliveryDate || null,
+  });
 
   if (counterDiscountPct != null && lineId) {
     const line = quotation.lines.id(lineId);

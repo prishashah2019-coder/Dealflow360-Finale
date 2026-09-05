@@ -4,6 +4,7 @@ import DataTable from '../components/DataTable.jsx'
 import StepTracker from '../components/StepTracker.jsx'
 import Badge from '../components/Badge.jsx'
 import { getInvoice, recordPayment } from '../api/invoices.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { mockInvoiceDetail } from '../mockData.js'
 
 function buildSteps(status) {
@@ -19,11 +20,14 @@ function buildSteps(status) {
 
 export default function InvoiceDetail() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const canRecordPayment = user?.role === 'finance' || user?.role === 'admin'
   const [invoice, setInvoice] = useState(null)
   const [payments, setPayments] = useState([])
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('card')
   const [busy, setBusy] = useState(false)
+  const [payMsg, setPayMsg] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -49,6 +53,7 @@ export default function InvoiceDetail() {
 
   const handleRecordPayment = async () => {
     setBusy(true)
+    setPayMsg('')
     try {
       // Only merge the status back in - res.data.invoice here is the bare
       // Invoice document (no product-name decoration), and re-fetching the
@@ -57,8 +62,9 @@ export default function InvoiceDetail() {
       setInvoice((inv) => ({ ...inv, status: res.data.invoice.status }))
       setPayments((prev) => [...prev, res.data.payment])
     } catch (err) {
-      console.warn('Record-payment API unavailable (demo mode).', err?.message)
-      setInvoice((inv) => ({ ...inv, status: 'Paid' }))
+      // Don't pretend it worked on failure - that previously marked the
+      // invoice "Paid" even when the request was rejected (e.g. wrong role).
+      setPayMsg(err?.response?.data?.error || 'Could not record this payment.')
     } finally {
       setBusy(false)
     }
@@ -96,11 +102,12 @@ export default function InvoiceDetail() {
         <DataTable columns={lineColumns} rows={invoice.lines || []} emptyMessage="No lines on this invoice." />
       </div>
 
-      {invoice.status !== 'Paid' && (
+      {invoice.status !== 'Paid' && canRecordPayment && (
         <div className="card">
           <div className="card-title-row">
             <h3>Record Payment</h3>
           </div>
+          {payMsg && <div className="error-text">{payMsg}</div>}
           <div className="form-row">
             <div className="form-field">
               <label>Amount</label>
@@ -117,6 +124,9 @@ export default function InvoiceDetail() {
           </div>
           <button className="btn btn-primary" disabled={busy} onClick={handleRecordPayment}>Record Payment</button>
         </div>
+      )}
+      {invoice.status !== 'Paid' && !canRecordPayment && (
+        <div className="note-banner">Only Finance/Admin can record a payment against this invoice.</div>
       )}
     </div>
   )

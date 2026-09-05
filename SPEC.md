@@ -238,3 +238,43 @@ Top nav (internal app): `Dashboard | Quotations | Approvals | Fulfillment | Subs
 - Font: system-ui/Inter, dark slate (`#1e293b`) text on glass panels.
 - Top nav bar itself: solid, not glass (matches wireframe's solid blue-ish header).
 ```
+
+## 7. Role permission matrix
+
+Each internal role gets a genuinely different nav (`client/src/components/Layout.jsx`)
+and different write access (enforced both client-side, for UX, and server-side via
+`requireRole`, for real security):
+
+| Action | Sales Rep | Sales Manager | Finance | Admin |
+|---|---|---|---|---|
+| Build/submit quotations | ✅ (own) | view all | view all | view all |
+| Approve/reject a step | only if step's role matches | ✅ (manager step) | ✅ (finance step) | — |
+| Configure discount tiers/approval chain | ❌ | ✅ | view only | ✅ |
+| Accept/override fulfillment split | ❌ (view only) | ❌ (view only) | ✅ | ✅ |
+| Modify/cancel subscription | ❌ (view only) | ❌ (view only) | ✅ | ✅ |
+| Record invoice payment | ❌ (view only) | ❌ (view only) | ✅ | ✅ |
+| Nudge/escalate a deal | ❌ (view only) | ✅ | ❌ (view only) | ✅ |
+| Manage products/warehouses/price lists/plans | ❌ | ❌ | ❌ | ✅ |
+| Provision Sales Manager/Finance/Admin accounts | ❌ | ❌ | ❌ | ✅ |
+| View platform-wide Audit Log | ❌ | ❌ | ❌ | ✅ |
+| View Credit Notes | ❌ | ❌ | ✅ | ✅ |
+| View Reports | ❌ | ✅ | ✅ | ✅ |
+
+Public self-signup (`POST /api/auth/signup`) can create any of the four internal
+roles directly (by design, for demo convenience) - this is intentionally more
+permissive than a real production app would be. `POST /api/users` (admin-only) is
+the "proper" provisioning path if you want to lock signup down to sales_rep only
+later.
+
+New endpoints added beyond the original contract:
+```
+GET  /api/audit-log                    (admin) - platform-wide activity log
+GET  /api/credit-notes                 (finance, admin)
+GET  /api/deal-health/nudges-for-me    (any internal role) - nudges/escalations
+                                         aimed at the caller's own quotations
+POST /api/users                        (admin) - provision sales_manager/finance/admin
+```
+
+New screens: Warehouses & Stock (`/admin/warehouses`, admin), Audit Log
+(`/admin/audit-log`, admin), Credit Notes (`/credit-notes`, finance+admin).
+

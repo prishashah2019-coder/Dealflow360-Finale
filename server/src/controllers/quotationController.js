@@ -163,13 +163,23 @@ async function decideApprovalStep(req, res) {
   res.json(quotation);
 }
 
+// Every fulfillment mutation below re-populates warehouseId/productId before
+// responding - without it, the split table shows raw ObjectIds instead of
+// names until the page happens to reload via getQuotation (which does populate).
+async function populateSplits(quotation) {
+  return quotation.populate([
+    { path: 'fulfillmentSplits.warehouseId', select: 'name' },
+    { path: 'fulfillmentSplits.productId', select: 'name' },
+  ]);
+}
+
 async function suggestFulfillment(req, res) {
   const quotation = await Quotation.findById(req.params.id);
   if (!quotation) return res.status(404).json({ error: 'Not found' });
   const splits = await suggestFulfillmentSplit(quotation.lines);
   quotation.fulfillmentSplits = splits;
   await quotation.save();
-  res.json(quotation);
+  res.json(await populateSplits(quotation));
 }
 
 async function acceptFulfillment(req, res) {
@@ -181,7 +191,7 @@ async function acceptFulfillment(req, res) {
   });
   await quotation.save();
   await log(quotation._id, 'fulfillment_accepted', req.auth.sub);
-  res.json(quotation);
+  res.json(await populateSplits(quotation));
 }
 
 async function overrideFulfillment(req, res) {
@@ -191,7 +201,7 @@ async function overrideFulfillment(req, res) {
   await commitFulfillmentSplit(quotation.fulfillmentSplits);
   await quotation.save();
   await log(quotation._id, 'fulfillment_overridden', req.auth.sub);
-  res.json(quotation);
+  res.json(await populateSplits(quotation));
 }
 
 async function confirmQuotation(req, res) {

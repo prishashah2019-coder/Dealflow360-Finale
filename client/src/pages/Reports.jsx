@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import StatCard from '../components/StatCard.jsx'
-import { getReports, getUsers } from '../api/reports.js'
+import { getReports } from '../api/reports.js'
+import { getUsers } from '../api/users.js'
 import { getProducts } from '../api/products.js'
 import { mockReports } from '../mockData.js'
 

@@ -4,6 +4,7 @@ import Kanban from '../components/Kanban.jsx'
 import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
 import { getQuotations, createQuotation } from '../api/quotations.js'
+import { getCustomers } from '../api/customers.js'
 import { mockQuotations } from '../mockData.js'
 
 const COLUMNS = [
@@ -22,6 +23,11 @@ function fmtAmount(q) {
 export default function QuotationsList() {
   const [quotations, setQuotations] = useState([])
   const [view, setView] = useState('kanban') // 'kanban' | 'table'
+  const [customers, setCustomers] = useState([])
+  const [showPicker, setShowPicker] = useState(false)
+  const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createErr, setCreateErr] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -33,6 +39,12 @@ export default function QuotationsList() {
       } catch (err) {
         console.warn('Falling back to mock quotations list.', err?.message)
         if (!cancelled) setQuotations(mockQuotations)
+      }
+      try {
+        const res = await getCustomers()
+        if (!cancelled) setCustomers(res.data || [])
+      } catch (err) {
+        console.warn('Could not load customers for the new-quotation picker.', err?.message)
       }
     }
     load()
@@ -53,13 +65,22 @@ export default function QuotationsList() {
     return byCol
   }, [quotations])
 
-  const handleNewQuotation = async () => {
+  // A quotation always belongs to a customer (the schema requires it) - the
+  // button previously created one with no customerId at all, which the
+  // backend rejected every time, then silently bounced to a route that
+  // doesn't exist. Collect the customer first.
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    if (!selectedCustomerId) return
+    setCreating(true)
+    setCreateErr('')
     try {
-      const res = await createQuotation({ status: 'Draft', lines: [] })
+      const res = await createQuotation({ customerId: selectedCustomerId, lines: [] })
       navigate(`/quotations/${res.data._id}`)
     } catch (err) {
-      console.warn('Create quotation API unavailable, opening a demo draft.', err?.message)
-      navigate('/quotations/new')
+      setCreateErr(err?.response?.data?.error || 'Could not create a new quotation.')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -79,12 +100,33 @@ export default function QuotationsList() {
           <div className="subtitle">Track every deal from draft to confirmed.</div>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={handleNewQuotation}>+ New Quotation</button>
+          <button className="btn btn-primary" onClick={() => setShowPicker((v) => !v)}>
+            {showPicker ? 'Cancel' : '+ New Quotation'}
+          </button>
           <button className="btn btn-secondary" onClick={() => setView(view === 'kanban' ? 'table' : 'kanban')}>
             Switch to {view === 'kanban' ? 'Table' : 'Kanban'} View
           </button>
         </div>
       </div>
+
+      {showPicker && (
+        <div className="card">
+          <div className="card-title-row"><h3>New Quotation</h3></div>
+          <form onSubmit={handleCreate}>
+            <div className="form-field">
+              <label>Customer</label>
+              <select value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} required>
+                <option value="">Select a customer…</option>
+                {customers.map((c) => <option key={c._id} value={c._id}>{c.name} ({c.tier})</option>)}
+              </select>
+            </div>
+            {createErr && <div className="error-text">{createErr}</div>}
+            <button className="btn btn-primary" type="submit" disabled={creating || !selectedCustomerId}>
+              {creating ? 'Creating…' : 'Create Draft Quotation'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {view === 'kanban' ? (
         <Kanban columns={COLUMNS} cardsByColumn={cardsByColumn} onCardClick={(card) => navigate(`/quotations/${card.id}`)} />

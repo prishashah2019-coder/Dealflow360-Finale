@@ -16,6 +16,8 @@ export const createWarehouse = (data) => client.post('/warehouses', data)
 
 // GET /api/stocks
 export const getStocks = () => client.get('/stocks')
+// PUT /api/stocks { productId, warehouseId, qtyAvailable, replenishmentRule }
+export const upsertStock = (data) => client.put('/stocks', data)
 
 // GET /api/subscription-plans
 export const getSubscriptionPlans = () => client.get('/subscription-plans')

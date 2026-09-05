@@ -12,6 +12,7 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const portalRoutes = require('./routes/portalRoutes');
 const dealHealthRoutes = require('./routes/dealHealthRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const creditNoteRoutes = require('./routes/creditNoteRoutes');
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/portal', portalRoutes);
 app.use('/api/deal-health', dealHealthRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/credit-notes', creditNoteRoutes);
 app.use('/api', catalogRoutes); // /customers, /products, /warehouses, /stocks, /price-lists, /discount-config, /subscription-plans, /upsell
 
 // Centralized error handler so async controller errors don't crash the process
@@ -39,7 +41,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-const PORT = process.env.PORT || 6000;
+const PORT = process.env.PORT || 5000;
 
 connectDB()
   .then(() => {
