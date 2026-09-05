@@ -8,6 +8,8 @@ export const createQuotation = (data) => client.post('/quotations', data)
 export const getQuotation = (id) => client.get(`/quotations/${id}`)
 // PUT /api/quotations/:id (edit lines while Draft)
 export const updateQuotation = (id, data) => client.put(`/quotations/${id}`, data)
+// POST /api/quotations/:id/negotiation/comments
+export const addNegotiationComment = (id, data) => client.post(`/quotations/${id}/negotiation/comments`, data)
 // POST /api/quotations/:id/submit-for-approval
 export const submitForApproval = (id) => client.post(`/quotations/${id}/submit-for-approval`)
 // POST /api/quotations/:id/fulfillment/suggest

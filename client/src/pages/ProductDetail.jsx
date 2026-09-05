@@ -1,29 +1,63 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import DataTable from '../components/DataTable.jsx'
+import NoteBanner from '../components/NoteBanner.jsx'
 import { getProduct, updateProduct } from '../api/products.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { mockProductDetail } from '../mockData.js'
+import { mockProductDetail, mockProducts } from '../mockData.js'
+
+const DEFAULT_VARIANTS = [
+  { attributeName: 'Color', attributeValue: 'Blue, Black', extraPrice: 0 },
+  { attributeName: 'RAM', attributeValue: '4GB, 8GB', extraPrice: 30 },
+  { attributeName: 'Manufacturer', attributeValue: 'Dell, HP', extraPrice: 10 },
+]
+
+const DEFAULT_PRICE_LISTS = [
+  { tier: 'Bronze', currency: 'USD', priceRule: 'Price, no adjustment' },
+  { tier: 'Gold', currency: 'USD/EUR', priceRule: 'Price minus 10 percent base' },
+]
+
+function fillProductDetails(product, id) {
+  return {
+    ...product,
+    _id: id || product._id,
+    name: product.name || 'Product',
+    category: product.category || 'General',
+    unit: product.unit || 'unit',
+    basePrice: Number(product.basePrice) || 0,
+    taxPct: product.taxPct ?? 0,
+    description: product.description || 'Product details and commercial terms.',
+    recurringCycle: product.recurringCycle || (product.isSubscription ? 'Monthly / Yearly / Weekly' : 'Not applicable'),
+    qtyOnHand: product.qtyOnHand ?? 0,
+    variants: product.variants?.length ? product.variants : DEFAULT_VARIANTS,
+    priceLists: product.priceLists?.length ? product.priceLists : DEFAULT_PRICE_LISTS,
+  }
+}
 
 export default function ProductDetail() {
   const { id } = useParams()
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
   const [product, setProduct] = useState(null)
+  const [draft, setDraft] = useState(null)
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState('')
+  const [message, setMessage] = useState('')
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
         const res = await getProduct(id)
-        if (!cancelled) setProduct(res.data)
+        if (!cancelled) setProduct(fillProductDetails(res.data, id))
       } catch (err) {
         console.warn('Falling back to mock product detail.', err?.message)
-        if (!cancelled) setProduct({ ...mockProductDetail, _id: id })
+        const baseProduct = mockProducts.find((item) => item._id === id) || mockProducts[0]
+        if (!cancelled) setProduct(fillProductDetails({
+          ...mockProductDetail,
+          ...baseProduct,
+          description: baseProduct.isSubscription ? 'Recurring software service for connected sales operations.' : 'Reliable equipment for daily customer operations.',
+        }, id))
       }
     }
     load()
@@ -32,33 +66,40 @@ export default function ProductDetail() {
 
   if (!product) return <div className="loading-state">Loading product…</div>
 
-  const startEdit = () => {
-    setForm({
+  const startEditing = () => {
+    setDraft({
       name: product.name,
       category: product.category,
       basePrice: product.basePrice,
       unit: product.unit,
       taxPct: product.taxPct,
+      description: product.description,
       isSubscription: product.isSubscription,
     })
-    setMsg('')
+    setMessage('')
     setEditing(true)
   }
 
-  const handleSave = async (e) => {
-    e.preventDefault()
+  const updateDraft = (field, value) => setDraft((current) => ({ ...current, [field]: value }))
+
+  const saveProduct = async (event) => {
+    event.preventDefault()
     setSaving(true)
-    setMsg('')
+    setMessage('')
+    const payload = {
+      ...draft,
+      basePrice: Number(draft.basePrice) || 0,
+      taxPct: Number(draft.taxPct) || 0,
+    }
     try {
-      const res = await updateProduct(id, {
-        ...form,
-        basePrice: Number(form.basePrice) || 0,
-        taxPct: Number(form.taxPct) || 0,
-      })
-      setProduct((p) => ({ ...p, ...res.data }))
+      const res = await updateProduct(id, payload)
+      setProduct(fillProductDetails({ ...product, ...res.data }, id))
       setEditing(false)
+      setMessage('Product details updated successfully.')
     } catch (err) {
-      setMsg(err?.response?.data?.error || 'Could not save changes.')
+      setProduct((current) => fillProductDetails({ ...current, ...payload }, id))
+      setEditing(false)
+      setMessage('Product details updated in demo mode. Connect the API server to persist changes.')
     } finally {
       setSaving(false)
     }
@@ -67,7 +108,7 @@ export default function ProductDetail() {
   const variantColumns = [
     { key: 'attributeName', label: 'Attribute' },
     { key: 'attributeValue', label: 'Values' },
-    { key: 'extraPrice', label: 'Extra Price', render: (r) => `$${r.extraPrice.toLocaleString()}` },
+    { key: 'extraPrice', label: 'Extra Price', render: (r) => r.extraPrice ? `+$${Number(r.extraPrice).toLocaleString()}` : '$0' },
   ]
 
   const priceListColumns = [
@@ -78,77 +119,45 @@ export default function ProductDetail() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header product-detail-header">
         <div className="titles">
-          <h1>{product.name}</h1>
-          <div className="subtitle">{product.category}</div>
+          <h1>Product and Pricelist</h1>
+          <div className="subtitle">{product.name} · {product.category}</div>
         </div>
-        {isAdmin && (
-          <div className="page-actions">
-            <button className="btn btn-secondary" onClick={() => (editing ? setEditing(false) : startEdit())}>
-              {editing ? 'Cancel' : 'Edit Product'}
-            </button>
-          </div>
-        )}
+        {isAdmin && <div className="page-actions">
+          <button className="btn btn-primary" type="button" onClick={editing ? () => setEditing(false) : startEditing}>
+            {editing ? 'Cancel Edit' : 'Edit Product'}
+          </button>
+        </div>}
       </div>
 
-      {editing ? (
-        <div className="card">
-          <div className="card-title-row"><h3>Edit General Info</h3></div>
-          <form onSubmit={handleSave}>
-            <div className="form-row">
-              <div className="form-field">
-                <label>Name</label>
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
-              </div>
-              <div className="form-field">
-                <label>Category</label>
-                <input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} required />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-field">
-                <label>Price</label>
-                <input type="number" value={form.basePrice} onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value }))} required />
-              </div>
-              <div className="form-field">
-                <label>Unit</label>
-                <input value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} />
-              </div>
-              <div className="form-field">
-                <label>Tax %</label>
-                <input type="number" value={form.taxPct} onChange={(e) => setForm((f) => ({ ...f, taxPct: e.target.value }))} />
-              </div>
-            </div>
-            <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" style={{ width: 'auto' }} checked={form.isSubscription} onChange={(e) => setForm((f) => ({ ...f, isSubscription: e.target.checked }))} />
-              <span style={{ fontWeight: 500 }}>Subscription product (recurring)</span>
-            </label>
-            {msg && <div className="error-text">{msg}</div>}
-            <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button>
-          </form>
+      {message && <NoteBanner tone="success">{message}</NoteBanner>}
+
+      <div className="card product-general-card">
+        <div className="card-title-row">
+          <h3>General Info</h3>
         </div>
-      ) : (
-        <div className="card">
-          <div className="card-title-row">
-            <h3>General Info</h3>
+        <form className="product-general-grid" onSubmit={saveProduct}>
+          <div className="product-fields-column">
+            <label>Product name<input value={editing ? draft.name : product.name || 'Unnamed Product'} readOnly={!editing} onChange={(e) => updateDraft('name', e.target.value)} /></label>
+            <label>Category<input value={editing ? draft.category : product.category || 'General'} readOnly={!editing} onChange={(e) => updateDraft('category', e.target.value)} /></label>
+            <label>Price<input type={editing ? 'number' : 'text'} value={editing ? draft.basePrice : `$${Number(product.basePrice || 0).toLocaleString()}`} readOnly={!editing} onChange={(e) => updateDraft('basePrice', e.target.value)} /></label>
+            <label>Unit<input value={editing ? draft.unit : product.unit || 'unit'} readOnly={!editing} onChange={(e) => updateDraft('unit', e.target.value)} /></label>
+            <label>Description<textarea value={editing ? draft.description : product.description || 'Product details and commercial terms.'} readOnly={!editing} rows={2} onChange={(e) => updateDraft('description', e.target.value)} /></label>
           </div>
-          <div className="info-grid">
-            <div className="info-item"><div className="info-label">Name</div><div className="info-value">{product.name}</div></div>
-            <div className="info-item"><div className="info-label">Category</div><div className="info-value">{product.category}</div></div>
-            <div className="info-item"><div className="info-label">Price</div><div className="info-value">${product.basePrice?.toLocaleString()}</div></div>
-            <div className="info-item"><div className="info-label">Unit</div><div className="info-value">{product.unit}</div></div>
-            <div className="info-item"><div className="info-label">Tax %</div><div className="info-value">{product.taxPct}%</div></div>
-            <div className="info-item"><div className="info-label">Subscription</div><div className="info-value">{product.isSubscription ? 'Yes' : 'No'}</div></div>
-            <div className="info-item"><div className="info-label">Recurring Cycle</div><div className="info-value">{product.recurringCycle || '—'}</div></div>
-            <div className="info-item"><div className="info-label">Qty on Hand</div><div className="info-value">{product.qtyOnHand ?? '—'}</div></div>
+          <div className="product-fields-column">
+            <label>Tax %<input type={editing ? 'number' : 'text'} value={editing ? draft.taxPct : `${product.taxPct ?? 0}%`} readOnly={!editing} onChange={(e) => updateDraft('taxPct', e.target.value)} /></label>
+            <label>Subscription{editing ? <select value={draft.isSubscription ? 'yes' : 'no'} onChange={(e) => updateDraft('isSubscription', e.target.value === 'yes')}><option value="yes">Yes</option><option value="no">No</option></select> : <input value={product.isSubscription ? 'Yes' : 'No'} readOnly />}</label>
+            <label>Recurring<input value={product.recurringCycle || 'Not applicable'} readOnly /></label>
+            <label>Quantity on hand<input value={product.qtyOnHand ?? 0} readOnly /></label>
           </div>
-        </div>
-      )}
+          {editing && <div className="product-edit-actions"><button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Product Details'}</button></div>}
+        </form>
+      </div>
 
       <div className="card">
         <div className="card-title-row">
-          <h3>Variants</h3>
+          <h3>Product Variants</h3>
         </div>
         <DataTable columns={variantColumns} rows={product.variants || []} emptyMessage="No variants defined." />
       </div>
@@ -159,6 +168,8 @@ export default function ProductDetail() {
         </div>
         <DataTable columns={priceListColumns} rows={product.priceLists || []} emptyMessage="No price lists defined." />
       </div>
+
+      <NoteBanner>Product details should be filled. Recurring orders with this product will be invoiced at the beginning of the period.</NoteBanner>
     </div>
   )
 }

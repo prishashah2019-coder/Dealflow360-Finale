@@ -39,6 +39,10 @@ export const mockQuotations = [
     createdAt: '2026-08-10T10:00:00Z',
     updatedAt: '2026-08-29T09:00:00Z',
     amount: 21750,
+    lines: [
+      { _id: 'l3', productId: { _id: 'p1', name: 'Industrial Sensor Kit', category: 'Hardware' }, variant: 'Standard', quantity: 15, unitPrice: 800, discountPct: 0, lineType: 'one_time' },
+      { _id: 'l4', productId: { _id: 'p2', name: 'Cloud Monitoring Suite', category: 'Software' }, variant: 'Pro', quantity: 1, unitPrice: 9750, discountPct: 0, lineType: 'recurring', subscriptionPlanId: 'plan1' },
+    ],
   },
   {
     _id: 'q1004',
@@ -49,6 +53,10 @@ export const mockQuotations = [
     createdAt: '2026-08-05T10:00:00Z',
     updatedAt: '2026-08-25T09:00:00Z',
     amount: 33900,
+    lines: [
+      { _id: 'l5', productId: { _id: 'p2', name: 'Cloud Monitoring Suite', category: 'Software' }, variant: 'Enterprise', quantity: 3, unitPrice: 11000, discountPct: 5, lineType: 'recurring', subscriptionPlanId: 'plan1' },
+      { _id: 'l6', productId: { _id: 'p3', name: 'Conveyor Belt Unit', category: 'Hardware' }, variant: 'Standard', quantity: 1, unitPrice: 4500, discountPct: 0, lineType: 'one_time' },
+    ],
   },
   {
     _id: 'q1005',
@@ -60,24 +68,77 @@ export const mockQuotations = [
     updatedAt: '2026-08-02T09:00:00Z',
     amount: 15300,
   },
+  {
+    _id: 'q1006',
+    customerId: { _id: 'c6', name: 'Green Valley Farms' },
+    salesRepId: { _id: 'u2', name: 'Jordan Lee' },
+    status: 'Draft',
+    blendedRiskScore: 0,
+    createdAt: '2026-08-27T10:00:00Z',
+    updatedAt: '2026-09-01T09:00:00Z',
+    amount: 20000,
+    lines: [
+      { _id: 'l7', productId: { _id: 'p1', name: 'Industrial Sensor Kit', category: 'Hardware' }, variant: 'Standard', quantity: 20, unitPrice: 1000, discountPct: 0, lineType: 'one_time' },
+    ],
+  },
+  {
+    _id: 'q1007',
+    customerId: { _id: 'c7', name: 'Delta Airlines Supply' },
+    salesRepId: { _id: 'u1', name: 'Priya Nair' },
+    status: 'Approved',
+    blendedRiskScore: 2.4,
+    createdAt: '2026-08-22T10:00:00Z',
+    updatedAt: '2026-09-02T09:00:00Z',
+    amount: 30000,
+    lines: [
+      { _id: 'l8', productId: { _id: 'p3', name: 'Conveyor Belt Unit', category: 'Hardware' }, variant: 'Heavy Duty', quantity: 3, unitPrice: 10000, discountPct: 0, lineType: 'one_time' },
+    ],
+  },
+  {
+    _id: 'q1008',
+    customerId: { _id: 'c8', name: 'Union Steelworks' },
+    salesRepId: { _id: 'u2', name: 'Jordan Lee' },
+    status: 'Confirmed',
+    blendedRiskScore: 0,
+    createdAt: '2026-08-18T10:00:00Z',
+    updatedAt: '2026-09-03T09:00:00Z',
+    amount: 40000,
+    lines: [
+      { _id: 'l9', productId: { _id: 'p3', name: 'Conveyor Belt Unit', category: 'Hardware' }, variant: 'Heavy Duty', quantity: 4, unitPrice: 10000, discountPct: 0, lineType: 'one_time' },
+    ],
+  },
+  {
+    _id: 'q1009',
+    customerId: { _id: 'c9', name: 'Cascade Retailers' },
+    salesRepId: { _id: 'u1', name: 'Priya Nair' },
+    status: 'Confirmed',
+    blendedRiskScore: 0,
+    createdAt: '2026-08-12T10:00:00Z',
+    updatedAt: '2026-09-04T09:00:00Z',
+    amount: 52450,
+    lines: [
+      { _id: 'l10', productId: { _id: 'p1', name: 'Industrial Sensor Kit', category: 'Hardware' }, variant: 'Industrial', quantity: 25, unitPrice: 1500, discountPct: 0, lineType: 'one_time' },
+      { _id: 'l11', productId: { _id: 'p2', name: 'Cloud Monitoring Suite', category: 'Software' }, variant: 'Pro', quantity: 1, unitPrice: 14950, discountPct: 0, lineType: 'recurring', subscriptionPlanId: 'plan1' },
+    ],
+  },
 ]
 
 export const mockApprovals = [
   {
     _id: 'a1', quotationId: 'q1002', customer: 'Blue Ridge Manufacturing', discountPct: 18,
-    riskLevel: 'High', stage: 'Sales Manager', assignedTo: 'Marcus Webb', status: 'pending',
+    riskLevel: 'High', stage: 'Sales Manager', assignedTo: 'Marcus Webb', limitPct: 12, status: 'pending',
   },
   {
-    _id: 'a2', quotationId: 'q1006', customer: 'Delta Airlines Supply', discountPct: 22,
-    riskLevel: 'High', stage: 'Finance', assignedTo: 'Rita Chen', status: 'pending',
+    _id: 'a2', quotationId: 'q1006', customer: 'Green Valley Farms', discountPct: 22,
+    riskLevel: 'High', stage: 'Finance', assignedTo: 'Rita Chen', limitPct: 15, status: 'pending',
   },
   {
-    _id: 'a3', quotationId: 'q1007', customer: 'Green Valley Farms', discountPct: 9,
-    riskLevel: 'Medium', stage: 'Sales Manager', assignedTo: 'Marcus Webb', status: 'approved',
+    _id: 'a3', quotationId: 'q1007', customer: 'Delta Airlines Supply', discountPct: 9,
+    riskLevel: 'Medium', stage: 'Sales Manager', assignedTo: 'Marcus Webb', limitPct: 12, status: 'approved',
   },
   {
     _id: 'a4', quotationId: 'q1008', customer: 'Union Steelworks', discountPct: 27,
-    riskLevel: 'High', stage: 'Finance', assignedTo: 'Rita Chen', status: 'rejected',
+    riskLevel: 'High', stage: 'Finance', assignedTo: 'Rita Chen', limitPct: 15, status: 'rejected',
   },
 ]
 
@@ -98,15 +159,14 @@ export const mockApprovalDetail = {
 }
 
 export const mockStocks = [
-  { product: 'Industrial Sensor Kit', warehouse: 'North DC', qtyFulfilled: 120, inStock: 340, reserved: 60, available: 280 },
-  { product: 'Bulk Packaging Roll', warehouse: 'West Coast Hub', qtyFulfilled: 88, inStock: 210, reserved: 40, available: 170 },
-  { product: 'Cold Chain Container', warehouse: 'East Regional', qtyFulfilled: 54, inStock: 150, reserved: 20, available: 130 },
+  { warehouse: 'Main Warehouse', product: 'Laptop Pro 14', inStock: 40, reserved: 18, available: 22 },
+  { warehouse: 'East Depot', product: 'Laptop Pro 14', inStock: 10, reserved: 6, available: 4 },
+  { warehouse: 'Main Warehouse', product: 'Docking Station', inStock: 65, reserved: 12, available: 53 },
 ]
 
 export const mockFulfillmentOrders = [
-  { order: 'q1003', customer: 'Northwind Traders', status: 'suggested', warehouse: 'North DC' },
-  { order: 'q1005', customer: 'Harborline Foods', status: 'fulfilled', warehouse: 'East Regional' },
-  { order: 'q1009', customer: 'Cascade Retailers', status: 'backorder', warehouse: 'West Coast Hub' },
+  { _id: 'q1002', order: 'Q-1042', customer: 'Acme Corp', status: 'Split Pending', warehouse: 'Main + East Depot' },
+  { _id: 'q1009', order: 'Q-1030', customer: 'Zenith Co', status: 'Backorder', warehouse: 'East Depot' },
 ]
 
 export const mockFulfillmentDetail = {
@@ -120,7 +180,7 @@ export const mockFulfillmentDetail = {
 
 export const mockSubscriptions = [
   { _id: 's1', customer: 'Acme Retail Co.', plan: 'Cloud Monitoring Suite - Pro', cycle: 'monthly', nextBill: '2026-09-15', status: 'active' },
-  { _id: 's2', customer: 'Summit Logistics', plan: 'Fleet Tracker - Standard', cycle: 'yearly', nextBill: '2027-01-02', status: 'trial' },
+  { _id: 's2', customer: 'Summit Logistics', plan: 'Fleet Tracker - Standard', cycle: 'yearly', nextBill: '2027-01-02', status: 'paused' },
   { _id: 's3', customer: 'Delta Airlines Supply', plan: 'Analytics Add-on', cycle: 'quarterly', nextBill: '2026-10-01', status: 'cancelled' },
 ]
 
@@ -196,13 +256,13 @@ export const mockProductDetail = {
 
 export const mockDiscountConfig = {
   tierCeilings: [
-    { tierName: 'Gold', maxDiscountPct: 20 },
-    { tierName: 'Silver', maxDiscountPct: 12 },
-    { tierName: 'Bronze', maxDiscountPct: 6 },
+    { tierName: 'Bronze', maxDiscountPct: 5 },
+    { tierName: 'Silver', maxDiscountPct: 10 },
+    { tierName: 'Gold', maxDiscountPct: 15 },
   ],
   categoryCeilings: [
     { category: 'Hardware', maxDiscountPct: 15 },
-    { category: 'Software', maxDiscountPct: 25 },
+    { category: 'Services', maxDiscountPct: 10 },
   ],
   approvalChainRules: [
     { minScore: 0, maxScore: 0, requiredRoles: [] },
@@ -226,8 +286,8 @@ export const mockPortalQuotation = {
 }
 
 export const mockActivity = [
-  { text: 'Priya Nair submitted Quotation q1002 for approval.', time: '2026-09-05T08:10:00Z' },
-  { text: 'Marcus Webb approved Quotation q1007 (Sales Manager step).', time: '2026-09-04T16:40:00Z' },
-  { text: 'Fulfillment split suggested for Quotation q1003.', time: '2026-09-04T11:05:00Z' },
-  { text: 'Customer Summit Logistics submitted a counter-discount on q1004.', time: '2026-09-03T09:22:00Z' },
+  { text: 'Priya Nair submitted Quotation q1002 for approval.', time: '2026-09-05T08:10:00Z', to: '/approvals/q1002' },
+  { text: 'Marcus Webb approved Quotation q1007 (Sales Manager step).', time: '2026-09-04T16:40:00Z', to: '/quotations/q1007' },
+  { text: 'Fulfillment split suggested for Quotation q1003.', time: '2026-09-04T11:05:00Z', to: '/fulfillment/q1003' },
+  { text: 'Customer Summit Logistics submitted a counter-discount on q1004.', time: '2026-09-03T09:22:00Z', to: '/quotations/q1004' },
 ]

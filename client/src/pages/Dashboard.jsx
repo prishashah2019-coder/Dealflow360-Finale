@@ -1,41 +1,55 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatCard from '../components/StatCard.jsx'
-import NoteBanner from '../components/NoteBanner.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
 import { getQuotations } from '../api/quotations.js'
-import { getDealHealth, getNudgesForMe } from '../api/dealHealth.js'
-import { getInvoices } from '../api/invoices.js'
-import { getSubscriptions } from '../api/subscriptions.js'
-import { getUsers } from '../api/users.js'
-import { getProducts } from '../api/products.js'
-import { mockQuotations } from '../mockData.js'
+import { getDealHealth } from '../api/dealHealth.js'
+import { mockQuotations, mockDealHealth, mockActivity } from '../mockData.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
-const ROLE_TITLES = {
-  sales_rep: ['Sales Dashboard', 'Your quotation pipeline at a glance.'],
-  sales_manager: ['Manager Dashboard', "Your team's pipeline, approvals, and risk signals."],
-  finance: ['Finance Dashboard', 'Approvals awaiting Finance, billing, and subscriptions.'],
-  admin: ['Admin Dashboard', 'Platform-wide activity, team accounts, and catalog.'],
+function quotationTotal(quotation) {
+  if (quotation.amount != null) return Number(quotation.amount) || 0
+  return (quotation.lines || []).reduce((sum, line) => {
+    const quantity = Number(line.quantity) || 0
+    const unitPrice = Number(line.unitPrice) || 0
+    const discount = (Number(line.discountPct) || 0) / 100
+    return sum + quantity * unitPrice * (1 - discount)
+  }, 0)
 }
 
-function hasPendingStepFor(quotation, role) {
-  return (quotation.approvals || []).some((a) => a.status === 'pending' && a.approverRole === role)
+function formatRevenue(amount) {
+  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`
+  if (amount >= 1000) return `$${Math.round(amount / 1000)}K`
+  return `$${Math.round(amount).toLocaleString()}`
+}
+
+function getIstGreeting() {
+  const hour = Number(new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date()))
+
+  if (hour < 5) return 'GOOD NIGHT,'
+  if (hour < 12) return 'GOOD MORNING,'
+  if (hour < 17) return 'GOOD AFTERNOON,'
+  if (hour < 21) return 'GOOD EVENING,'
+  return 'GOOD NIGHT,'
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
-  const role = user?.role || 'sales_rep'
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
   const [quotations, setQuotations] = useState([])
-  const [dealHealthCount, setDealHealthCount] = useState(0)
-  const [extra, setExtra] = useState({}) // role-specific secondary stat
-  const [nudges, setNudges] = useState([]) // cross-role: manager nudges/escalations aimed at my deals
+  const [alertCount, setAlertCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
   useEffect(() => {
     let cancelled = false
+
     async function load() {
       let quotes = mockQuotations
+      let alerts = mockDealHealth.length
+
       try {
         const res = await getQuotations()
         quotes = res.data
@@ -45,154 +59,83 @@ export default function Dashboard() {
 
       try {
         const res = await getDealHealth()
-        const d = res.data || {}
-        setDealHealthCount((d.stalled?.length || 0) + (d.anomalies?.length || 0) + (d.slippage?.length || 0))
+        alerts = Array.isArray(res.data) ? res.data.length : alerts
       } catch (err) {
-        console.warn('Deal health unavailable on dashboard.', err?.message)
-      }
-
-      if (role === 'sales_rep') {
-        try {
-          const res = await getNudgesForMe()
-          if (!cancelled) setNudges(res.data || [])
-        } catch (err) {
-          console.warn('Nudges unavailable on dashboard.', err?.message)
-        }
-      }
-
-      if (role === 'finance') {
-        try {
-          const [invRes, subRes] = await Promise.all([getInvoices(), getSubscriptions()])
-          const unpaid = (invRes.data || []).filter((i) => i.status !== 'Paid').length
-          const active = (subRes.data || []).filter((s) => s.status === 'active').length
-          if (!cancelled) setExtra({ unpaidInvoices: unpaid, activeSubscriptions: active })
-        } catch (err) {
-          console.warn('Finance stats unavailable on dashboard.', err?.message)
-        }
-      } else if (role === 'admin') {
-        try {
-          const [usersRes, productsRes] = await Promise.all([getUsers(), getProducts()])
-          if (!cancelled) setExtra({ teamAccounts: (usersRes.data || []).length, totalProducts: (productsRes.data || []).length })
-        } catch (err) {
-          console.warn('Admin stats unavailable on dashboard.', err?.message)
-        }
+        console.warn('Falling back to mock deal health count on dashboard.', err?.message)
       }
 
       if (!cancelled) {
         setQuotations(quotes)
+        setAlertCount(alerts)
         setLoading(false)
       }
     }
 
     load()
     return () => { cancelled = true }
-  }, [role])
+  }, [])
 
-  const openQuotations = quotations.filter((q) => !['Confirmed', 'Rejected'].includes(q.status)).length
-  const pendingApprovalsMine = role === 'sales_rep'
-    ? quotations.filter((q) => q.status === 'Pending Approval').length
-    : quotations.filter((q) => hasPendingStepFor(q, role)).length
-
-  const [title, subtitle] = ROLE_TITLES[role] || ROLE_TITLES.sales_rep
-
-  const recent = [...quotations]
-    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-    .slice(0, 5)
-    .map((q) => ({
-      text: `${q.customerId?.name || q.customer || 'A customer'} — ${q.status}`,
-      time: q.updatedAt,
-    }))
+  const pendingApprovals = quotations.filter((q) => q.status === 'Pending Approval').length
+  const openQuotations = quotations.filter((q) => ['Draft', 'Pending Approval', 'Under Negotiation'].includes(q.status)).length
+  const totalRevenue = quotations.reduce((sum, quotation) => sum + quotationTotal(quotation), 0)
+  const pipelineStatuses = ['Draft', 'Pending Approval', 'Approved', 'Under Negotiation', 'Confirmed']
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header dashboard-welcome">
         <div className="titles">
-          <h1>{title}</h1>
-          <div className="subtitle">{subtitle}</div>
+          <span className="eyebrow">{getIstGreeting()}</span>
+          <h1>{user?.name || 'Alex Admin'} <span className="welcome-wave">👋</span></h1>
+          <div className="subtitle">Here’s what’s happening across your sales pipeline today.</div>
         </div>
+        <div className="dashboard-quote">“Smarter deals.<br />Stronger relationships.”</div>
+        <div className="dashboard-date"><i className="fa-regular fa-calendar" /> <span>Friday<strong>Sep 5, 2026</strong></span></div>
         <div className="page-actions">
-          {role === 'sales_rep' && (
-            <>
-              <button className="btn btn-primary" onClick={() => navigate('/quotations')}>+ New Quotation</button>
-              <button className="btn btn-secondary" onClick={() => navigate('/approvals')}>View Approvals</button>
-            </>
-          )}
-          {role === 'sales_manager' && (
-            <>
-              <button className="btn btn-primary" onClick={() => navigate('/approvals')}>View Approvals</button>
-              <button className="btn btn-secondary" onClick={() => navigate('/deal-health')}>Deal Health</button>
-            </>
-          )}
-          {role === 'finance' && (
-            <>
-              <button className="btn btn-primary" onClick={() => navigate('/invoices')}>View Invoices</button>
-              <button className="btn btn-secondary" onClick={() => navigate('/approvals')}>View Approvals</button>
-            </>
-          )}
-          {role === 'admin' && (
-            <>
-              <button className="btn btn-primary" onClick={() => navigate('/admin/discount-config')}>Manage Team &amp; Config</button>
-              <button className="btn btn-secondary" onClick={() => navigate('/reports')}>View Reports</button>
-            </>
-          )}
+          <button className="btn btn-primary" onClick={() => navigate('/quotations')}>+ New Quotation</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/approvals')}>View Approvals</button>
         </div>
       </div>
-
-      {role === 'sales_rep' && nudges.length > 0 && (
-        <NoteBanner icon="👋">
-          {nudges.map((n, i) => (
-            <div key={i}>
-              {n.by} {n.action === 'escalated' ? 'escalated' : 'nudged you about'} the <strong>{n.customer}</strong> deal
-              {' '}({new Date(n.timestamp).toLocaleDateString()}).
-            </div>
-          ))}
-        </NoteBanner>
-      )}
 
       <div className="stat-grid">
-        {role === 'sales_rep' && (
-          <>
-            <StatCard label="Pending Approvals" value={loading ? '…' : pendingApprovalsMine} accent="amber" />
-            <StatCard label="Open Quotations" value={loading ? '…' : openQuotations} accent="green" />
-            <StatCard label="At-Risk Deals" value={loading ? '…' : dealHealthCount} accent="red" />
-          </>
-        )}
-        {role === 'sales_manager' && (
-          <>
-            <StatCard label="Awaiting My Approval" value={loading ? '…' : pendingApprovalsMine} accent="amber" />
-            <StatCard label="Team Open Quotations" value={loading ? '…' : openQuotations} accent="green" />
-            <StatCard label="At-Risk Deals" value={loading ? '…' : dealHealthCount} accent="red" />
-          </>
-        )}
-        {role === 'finance' && (
-          <>
-            <StatCard label="Awaiting My Approval" value={loading ? '…' : pendingApprovalsMine} accent="amber" />
-            <StatCard label="Unpaid Invoices" value={loading ? '…' : (extra.unpaidInvoices ?? '—')} accent="red" />
-            <StatCard label="Active Subscriptions" value={loading ? '…' : (extra.activeSubscriptions ?? '—')} accent="green" />
-          </>
-        )}
-        {role === 'admin' && (
-          <>
-            <StatCard label="Platform Quotations" value={loading ? '…' : quotations.length} accent="green" />
-            <StatCard label="Team Accounts" value={loading ? '…' : (extra.teamAccounts ?? '—')} />
-            <StatCard label="Total Products" value={loading ? '…' : (extra.totalProducts ?? '—')} />
-          </>
-        )}
+        <StatCard label="Pending Approvals" value={loading ? '…' : pendingApprovals} accent="amber" icon="fa-solid fa-file-lines" sub="View approval queue" onClick={() => navigate('/approvals')} />
+        <StatCard label="Open Quotations" value={loading ? '…' : openQuotations} accent="green" icon="fa-solid fa-file-invoice" sub="View active quotations" onClick={() => navigate('/quotations')} />
+        <StatCard label="At-Risk Deals" value={loading ? '…' : alertCount} accent="red" icon="fa-solid fa-triangle-exclamation" sub="View deal health" onClick={() => navigate('/deal-health')} />
+        <StatCard label="Total Revenue" value={loading ? '…' : formatRevenue(totalRevenue)} accent="blue" icon="fa-solid fa-chart-column" sub="View net revenue report" onClick={() => navigate('/reports?metric=revenue')} />
       </div>
 
-      <div className="card">
+      <div className="dashboard-grid">
+      <div className="card activity-card">
         <div className="card-title-row">
-          <h3>Recent Activity</h3>
+          <div><h3>Recent Activity</h3><span className="card-subtitle">Latest updates from your team</span></div>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/deal-health')}>View All Activity <span>›</span></button>
         </div>
         <ul className="activity-feed">
-          {recent.length === 0 && <li>No recent quotation activity yet.</li>}
-          {recent.map((item, idx) => (
+          {mockActivity.map((item, idx) => (
             <li key={idx}>
+              <button className="activity-item-action" type="button" onClick={() => navigate(item.to)}>
               {item.text}
               <span className="activity-time">{new Date(item.time).toLocaleString()}</span>
+              </button>
             </li>
           ))}
         </ul>
+      </div>
+      <div className="card pipeline-card">
+        <div className="card-title-row"><div><h3>Quotation Pipeline</h3><span className="card-subtitle">Deals across all stages</span></div><button className="btn btn-secondary btn-sm" onClick={() => navigate('/quotations')}>View All</button></div>
+        <div className="pipeline-list">
+          {pipelineStatuses.map((status) => {
+            const count = quotations.filter((quotation) => quotation.status === status).length
+            return <div className="pipeline-row" key={status}><span>{status}</span><div className="pipeline-track"><i style={{ width: `${Math.max(count * 24, 10)}%` }} /></div><strong>{count}</strong></div>
+          })}
+        </div>
+      </div>
+      <div className="card quick-actions-card">
+        <div className="card-title-row"><div><h3>Quick Actions</h3><span className="card-subtitle">Jump to what you need</span></div></div>
+        <button className="quick-action primary" onClick={() => navigate('/quotations')}><i className="fa-solid fa-plus" /> New Quotation <span>→</span></button>
+        <button className="quick-action" onClick={() => navigate('/approvals')}><i className="fa-solid fa-users" /> Manage Approvals <span>→</span></button>
+        <button className="quick-action" onClick={() => navigate('/fulfillment')}><i className="fa-solid fa-cube" /> View Fulfillment <span>→</span></button>
+        <button className="quick-action" onClick={() => navigate('/reports')}><i className="fa-solid fa-chart-column" /> View Reports <span>→</span></button>
+      </div>
       </div>
     </div>
   )

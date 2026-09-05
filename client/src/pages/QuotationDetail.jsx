@@ -3,14 +3,27 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Badge from '../components/Badge.jsx'
 import DataTable from '../components/DataTable.jsx'
 import NoteBanner from '../components/NoteBanner.jsx'
-import { getQuotation, updateQuotation, submitForApproval } from '../api/quotations.js'
-import { getUpsell } from '../api/products.js'
+import { getQuotation, updateQuotation, submitForApproval, addNegotiationComment } from '../api/quotations.js'
+import { getUpsell, getProducts } from '../api/products.js'
 import { mockQuotations } from '../mockData.js'
 
 const MOCK_UPSELL = [
   { _id: 'up1', product: 'Extended Warranty Plan', marginDelta: '+12%' },
   { _id: 'up2', product: 'Priority Support Add-on', marginDelta: '+8%' },
 ]
+
+function getLineLimit(line) {
+  if (line.limitAllowed != null) return Number(line.limitAllowed)
+  return (line.productId?.category || line.category) === 'Software' ? 25 : 15
+}
+
+function getLineStatus(line) {
+  const discount = Number(line.discountPct) || 0
+  const limit = getLineLimit(line)
+  return discount > limit
+    ? { label: `OVER (+${Math.round(discount - limit)}pt)`, over: true }
+    : { label: 'OK', over: false }
+}
 
 export default function QuotationDetail() {
   const { id } = useParams()
@@ -20,6 +33,9 @@ export default function QuotationDetail() {
   const [dismissed, setDismissed] = useState([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState([])
+  const [negotiation, setNegotiation] = useState({ lineId: '', message: '', discount: '', deliveryDate: '' })
+  const [negotiationNotice, setNegotiationNotice] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +68,10 @@ export default function QuotationDetail() {
     load()
     return () => { cancelled = true }
   }, [id])
+
+  useEffect(() => {
+    getProducts().then((res) => setProducts(res.data || [])).catch(() => setProducts([]))
+  }, [])
 
   // getQuotation decorates lines with display-only fields (limitAllowed,
   // overagePct, givenBy, a populated productId) that aren't part of the
@@ -107,6 +127,42 @@ export default function QuotationDetail() {
     }
   }
 
+  const updateLine = (index, field, value) => {
+    setQuotation((current) => ({
+      ...current,
+      lines: (current.lines || []).map((line, lineIndex) => lineIndex === index
+        ? { ...line, [field]: ['quantity', 'unitPrice', 'discountPct'].includes(field) ? Number(value) : value }
+        : line),
+    }))
+  }
+
+  const handleNegotiation = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setNegotiationNotice('')
+    const payload = {
+      lineId: negotiation.lineId || quotation.lines?.[0]?._id,
+      commentText: negotiation.message,
+      counterDiscountPct: negotiation.discount === '' ? undefined : Number(negotiation.discount),
+      requestedDeliveryDate: negotiation.deliveryDate || undefined,
+    }
+    try {
+      const res = await addNegotiationComment(id, payload)
+      setQuotation(res.data)
+      setNegotiation({ lineId: '', message: '', discount: '', deliveryDate: '' })
+      setNegotiationNotice('Negotiation response sent to the customer.')
+    } catch (err) {
+      setQuotation((current) => ({
+        ...current,
+        status: 'Under Negotiation',
+        negotiationComments: [...(current.negotiationComments || []), { ...payload, authorType: 'rep', createdAt: new Date().toISOString() }],
+      }))
+      setNegotiationNotice('Negotiation response saved in demo mode. Connect the API server to send it.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading || !quotation) return <div className="loading-state">Loading quotation…</div>
 
   const lines = quotation.lines || []
@@ -116,11 +172,8 @@ export default function QuotationDetail() {
     { key: 'quantity', label: 'Qty' },
     { key: 'unitPrice', label: 'Price', render: (l) => `$${l.unitPrice?.toLocaleString?.() ?? l.unitPrice}` },
     { key: 'discountPct', label: 'Discount', render: (l) => `${l.discountPct || 0}%` },
-    { key: 'limitAllowed', label: 'Limit %', render: (l) => l.limitAllowed != null ? (
-      <span className={`limit-pill${(l.discountPct || 0) > l.limitAllowed ? ' over' : ''}`}>{l.limitAllowed}%</span>
-    ) : '—' },
-    { key: 'list', label: 'List', render: (l) => `$${(l.quantity * l.unitPrice).toLocaleString()}` },
-    { key: 'other', label: 'Other', render: (l) => `$${(l.quantity * l.unitPrice * (1 - (l.discountPct || 0) / 100)).toLocaleString()}` },
+    { key: 'limitAllowed', label: 'Limit', render: (l) => <span className="limit-pill">{getLineLimit(l)}%</span> },
+    { key: 'status', label: 'Status', render: (l) => { const status = getLineStatus(l); return <span className={`line-status${status.over ? ' line-status-over' : ''}`}>{status.label}</span> } },
   ]
 
   const handleAddUpsell = (u) => {
@@ -149,16 +202,15 @@ export default function QuotationDetail() {
     <div>
       <div className="page-header">
         <div className="titles">
-          <h1>{quotation.customerId?.name || quotation.customer || 'Customer'}</h1>
-          <div className="subtitle">
-            <Badge status={quotation.status}>{quotation.status}</Badge>
-            {'  '}Quotation {quotation._id}
-          </div>
+          <h1>Quotation Detail: {quotation._id} ({quotation.customerId?.name || quotation.customer || 'Customer'})</h1>
+          <div className="subtitle">Opened from the quotation list. Add products, apply discounts, and review upsells.</div>
+          <div className="quotation-status"><Badge status={quotation.status}>{quotation.status}</Badge></div>
         </div>
-        <div className="page-actions">
-          <button className="btn btn-secondary" onClick={handleSaveDraft} disabled={saving}>Save Draft</button>
-          <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>Submit for Approval</button>
-        </div>
+      </div>
+
+      <div className="quotation-meta-fields">
+        <label><span>Customer</span><input value={quotation.customerId?.name || quotation.customer || 'Customer'} readOnly /></label>
+        <label><span>Price List</span><input value={quotation.customerId?.tier ? `${quotation.customerId.tier} Price List` : quotation.priceList || 'Standard Price List'} readOnly /></label>
       </div>
 
       <NoteBanner>
@@ -171,39 +223,61 @@ export default function QuotationDetail() {
         <div className="card-title-row">
           <h3>Quotation Lines</h3>
         </div>
-        <DataTable columns={lineColumns} rows={lines} emptyMessage="No lines added yet." />
+        {quotation.status === 'Draft' ? (
+          <div className="editable-lines quotation-lines-grid">
+            <div className="quotation-line-header"><span>Product</span><span>Qty</span><span>Price</span><span>Discount</span><span>Limit</span><span>Status</span></div>
+            {lines.map((line, index) => (
+              <div className="quotation-line-form" key={line._id || `line-${index}`}>
+                <div className="form-field"><label>Product</label><select value={line.productId?._id || line.productId || ''} onChange={(e) => updateLine(index, 'productId', products.find((product) => product._id === e.target.value) || e.target.value)}><option value="">Select product</option>{products.map((product) => <option key={product._id} value={product._id}>{product.name}</option>)}</select></div>
+                <div className="form-field"><label>Qty</label><input type="number" min="1" value={line.quantity || 1} onChange={(e) => updateLine(index, 'quantity', e.target.value)} /></div>
+                <div className="form-field"><label>Unit Price</label><input type="number" min="0" value={line.unitPrice || 0} onChange={(e) => updateLine(index, 'unitPrice', e.target.value)} /></div>
+                <div className="form-field"><label>Discount %</label><input type="number" min="0" max="100" value={line.discountPct || 0} onChange={(e) => updateLine(index, 'discountPct', e.target.value)} /></div>
+                <div className="quotation-line-status"><span>{getLineLimit(line)}%</span></div>
+                <div className="quotation-line-status"><strong className={getLineStatus(line).over ? 'line-status-over' : ''}>{getLineStatus(line).label}</strong></div>
+              </div>
+            ))}
+            {lines.length === 0 && <div className="empty-row">No lines added yet. Add an upsell below or create the quotation with line items.</div>}
+          </div>
+        ) : <DataTable columns={lineColumns} rows={lines} emptyMessage="No lines added yet." />}
       </div>
 
-      <div className="card">
+      {['Draft', 'Approved', 'Pending Approval', 'Under Negotiation'].includes(quotation.status) && (
+        <div className="card negotiation-card">
+          <div className="card-title-row"><div><h3>Negotiate This Deal</h3><span className="card-subtitle">Send revised terms or a response to the customer portal.</span></div></div>
+          {negotiationNotice && <NoteBanner tone="success">{negotiationNotice}</NoteBanner>}
+          <form onSubmit={handleNegotiation}>
+            <div className="form-row">
+              <div className="form-field"><label>Line</label><select value={negotiation.lineId} onChange={(e) => setNegotiation((current) => ({ ...current, lineId: e.target.value }))}><option value="">Select line</option>{lines.map((line) => <option key={line._id} value={line._id}>{line.productId?.name || line.product || 'Quotation line'}</option>)}</select></div>
+              <div className="form-field"><label>Revised Discount %</label><input type="number" min="0" max="100" value={negotiation.discount} onChange={(e) => setNegotiation((current) => ({ ...current, discount: e.target.value }))} placeholder="Optional" /></div>
+              <div className="form-field"><label>Delivery Date</label><input type="date" value={negotiation.deliveryDate} onChange={(e) => setNegotiation((current) => ({ ...current, deliveryDate: e.target.value }))} /></div>
+            </div>
+            <div className="form-field"><label>Message</label><textarea rows="3" value={negotiation.message} onChange={(e) => setNegotiation((current) => ({ ...current, message: e.target.value }))} placeholder="Explain the revised terms..." /></div>
+            <button className="btn btn-primary" type="submit" disabled={saving}>Send Negotiation Response</button>
+          </form>
+        </div>
+      )}
+
+      <div className="card upsell-suggestions-card">
         <div className="card-title-row">
           <h3>Upsell and Cross-Sell Suggestions</h3>
         </div>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Margin Delta</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="upsell-card-grid">
               {upsell.filter((u) => !dismissed.includes(u._id)).map((u) => (
-                <tr key={u._id}>
-                  <td>{u.product?.name || (typeof u.product === 'string' ? u.product : u.suggestedProductId?.name) || 'Suggested product'}</td>
-                  <td>{u.marginDelta || (u.minMarginThreshold != null ? `min margin ${u.minMarginThreshold}%` : '+—')}{u.isPromoted ? ' 🔥' : ''}</td>
-                  <td className="text-right">
-                    <button className="btn btn-primary btn-sm" style={{ marginRight: 8 }} onClick={() => handleAddUpsell(u)}>Add</button>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setDismissed((d) => [...d, u._id])}>Dismiss</button>
-                  </td>
-                </tr>
+                <div className="upsell-suggestion" key={u._id}>
+                  <strong>+ {u.product?.name || (typeof u.product === 'string' ? u.product : u.suggestedProductId?.name) || 'Suggested product'}</strong>
+                  <span>{u.marginDelta || (u.minMarginThreshold != null ? `min margin ${u.minMarginThreshold}%` : 'Recommended add-on')}{u.isPromoted ? ' 🔥' : ''}</span>
+                  <div><button className="btn btn-primary btn-sm" onClick={() => handleAddUpsell(u)}>Add</button><button className="btn btn-secondary btn-sm" onClick={() => setDismissed((d) => [...d, u._id])}>Dismiss</button></div>
+                </div>
               ))}
               {upsell.filter((u) => !dismissed.includes(u._id)).length === 0 && (
-                <tr className="empty-row"><td colSpan={3}>No suggestions right now.</td></tr>
+                <div className="empty-row">No suggestions right now.</div>
               )}
-            </tbody>
-          </table>
         </div>
+      </div>
+
+      <div className="quotation-actions-bottom">
+        <button className="btn btn-secondary" onClick={handleSaveDraft} disabled={saving}>Save Draft</button>
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>Submit for Approval</button>
       </div>
     </div>
   )

@@ -51,6 +51,8 @@ export default function InvoiceDetail() {
 
   if (!invoice) return <div className="loading-state">Loading invoice…</div>
 
+  const invoiceLabel = invoice.number && invoice.number !== invoice._id ? invoice.number : 'Invoice'
+
   const handleRecordPayment = async () => {
     setBusy(true)
     setPayMsg('')
@@ -83,7 +85,7 @@ export default function InvoiceDetail() {
     <div>
       <div className="page-header">
         <div className="titles">
-          <h1>{invoice.number || invoice._id} — {invoice.customer || invoice.customerId?.name}</h1>
+          <h1>{invoiceLabel} — {invoice.customer || invoice.customerId?.name || 'Customer'}</h1>
           <div className="subtitle"><Badge status={invoice.status}>{invoice.status}</Badge> Due {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : '—'}</div>
         </div>
         <div className="page-actions">

@@ -19,28 +19,11 @@ async function resolveOwnQuotation(customerId, id) {
   return id === 'me' ? cursor.sort({ updatedAt: -1 }) : cursor;
 }
 
-function lineTotal(line) {
-  return Math.round(line.unitPrice * (1 - (line.discountPct || 0) / 100) * line.quantity * 100) / 100;
-}
-
-// Portal home: every quotation this customer can see (never another
-// customer's), with just enough summary info to render a list without a
-// second round trip per row.
 async function listOwnQuotations(req, res) {
   const quotations = await Quotation.find({ customerId: req.auth.sub, status: { $ne: 'Draft' } })
-    .select('_id status blendedRiskScore updatedAt createdAt lines')
+    .select('_id status blendedRiskScore updatedAt')
     .sort({ updatedAt: -1 });
-  res.json(
-    quotations.map((q) => ({
-      _id: q._id,
-      status: q.status,
-      blendedRiskScore: q.blendedRiskScore,
-      updatedAt: q.updatedAt,
-      createdAt: q.createdAt,
-      lineCount: q.lines.length,
-      total: q.lines.reduce((sum, l) => sum + lineTotal(l), 0),
-    }))
-  );
+  res.json(quotations);
 }
 
 async function getOwnQuotation(req, res) {
@@ -54,13 +37,10 @@ async function addComment(req, res) {
   if (!quotation) return res.status(404).json({ error: 'Not found' });
 
   const { lineId, commentText, counterDiscountPct, requestedDeliveryDate } = req.body;
-  quotation.negotiationComments.push({
-    authorType: 'customer',
-    lineId,
-    commentText,
-    counterDiscountPct,
-    requestedDeliveryDate: requestedDeliveryDate || null,
-  });
+  if (counterDiscountPct != null && (Number(counterDiscountPct) < 0 || Number(counterDiscountPct) > 100)) {
+    return res.status(400).json({ error: 'Counter discount must be between 0 and 100.' });
+  }
+  quotation.negotiationComments.push({ authorType: 'customer', lineId, commentText, counterDiscountPct, requestedDeliveryDate });
 
   if (counterDiscountPct != null && lineId) {
     const line = quotation.lines.id(lineId);

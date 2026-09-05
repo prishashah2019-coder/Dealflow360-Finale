@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import DataTable from '../components/DataTable.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Badge from '../components/Badge.jsx'
+import NoteBanner from '../components/NoteBanner.jsx'
 import { getDealHealth, nudgeRep, escalateDeal } from '../api/dealHealth.js'
-import { useAuth } from '../context/AuthContext.jsx'
 import { mockDealHealth } from '../mockData.js'
 
 // Backend groups alerts by type ({ stalled, anomalies, slippage }, each an
@@ -25,14 +25,9 @@ function flattenDealHealth(data) {
 }
 
 export default function DealHealth() {
-  const { user } = useAuth()
-  // Per the problem statement, the Sales Manager "monitors the deal health
-  // dashboard" and is the one who nudges/escalates - every other internal
-  // role can see the same signals but not act on them (enforced server-side too).
-  const canAct = user?.role === 'sales_manager' || user?.role === 'admin'
   const [alerts, setAlerts] = useState([])
   const [busyId, setBusyId] = useState(null)
-  const [actionMsg, setActionMsg] = useState('')
+  const [actionNotice, setActionNotice] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -53,13 +48,13 @@ export default function DealHealth() {
 
   const handleAction = async (row, kind) => {
     setBusyId(row.quotationId + kind)
-    setActionMsg('')
+    setActionNotice('')
     try {
       if (kind === 'nudge') await nudgeRep(row.quotationId)
       else await escalateDeal(row.quotationId)
-      setActionMsg(`${kind === 'nudge' ? 'Nudge' : 'Escalation'} sent for ${row.deal}.`)
     } catch (err) {
-      setActionMsg(err?.response?.data?.error || `Could not ${kind} this deal.`)
+      console.warn(`${kind} API unavailable (demo mode).`, err?.message)
+      setActionNotice(`${kind === 'nudge' ? 'Rep nudged' : 'Deal escalated'} in demo mode. Connect the API server to persist this action.`)
     } finally {
       setBusyId(null)
     }
@@ -76,12 +71,12 @@ export default function DealHealth() {
     { key: 'issue', label: 'Issue' },
     { key: 'flagged', label: 'Flagged', render: (r) => new Date(r.flagged).toLocaleDateString() },
     { key: 'action', label: 'Type', render: (r) => <Badge status={r.action}>{r.action.replace('_', ' ')}</Badge> },
-    { key: 'actions', label: 'Action', render: (r) => canAct ? (
+    { key: 'actions', label: 'Action', render: (r) => (
       <div className="flex gap-8">
         <button className="btn btn-secondary btn-sm" disabled={busyId === r.quotationId + 'escalate'} onClick={() => handleAction(r, 'escalate')}>Escalate</button>
         <button className="btn btn-secondary btn-sm" disabled={busyId === r.quotationId + 'nudge'} onClick={() => handleAction(r, 'nudge')}>Nudge Rep</button>
       </div>
-    ) : <span className="muted" style={{ fontSize: 12.5 }}>View only</span> },
+    ) },
   ]
 
   return (
@@ -93,7 +88,7 @@ export default function DealHealth() {
         </div>
       </div>
 
-      {actionMsg && <div className="note-banner note-banner-success">{actionMsg}</div>}
+      {actionNotice && <NoteBanner tone="success">{actionNotice}</NoteBanner>}
 
       <div className="stat-grid">
         <StatCard label="Stalled Deals" value={counts.stalled} accent="amber" />

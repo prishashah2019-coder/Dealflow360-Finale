@@ -1,77 +1,98 @@
+import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
-// Each internal role sees a genuinely different nav, matching its actual
-// responsibilities per the problem statement - not just the same 9 links
-// for everyone with different data underneath.
-const NAV_BY_ROLE = {
-  sales_rep: [
-    { label: 'Dashboard', to: '/dashboard' },
-    { label: 'Quotations', to: '/quotations' },
-    { label: 'Approvals', to: '/approvals' },
-    { label: 'Fulfillment', to: '/fulfillment' },
-    { label: 'Subscriptions', to: '/subscriptions' },
-    { label: 'Invoices', to: '/invoices' },
-    { label: 'Deal Health', to: '/deal-health' },
-    { label: 'Product', to: '/products' },
-  ],
-  sales_manager: [
-    { label: 'Dashboard', to: '/dashboard' },
-    { label: 'Quotations', to: '/quotations' },
-    { label: 'Approvals', to: '/approvals' },
-    { label: 'Deal Health', to: '/deal-health' },
-    { label: 'Discount Config', to: '/admin/discount-config' },
-    { label: 'Reports', to: '/reports' },
-  ],
-  finance: [
-    { label: 'Dashboard', to: '/dashboard' },
-    { label: 'Fulfillment', to: '/fulfillment' },
-    { label: 'Subscriptions', to: '/subscriptions' },
-    { label: 'Invoices', to: '/invoices' },
-    { label: 'Credit Notes', to: '/credit-notes' },
-    { label: 'Approvals', to: '/approvals' },
-    { label: 'Reports', to: '/reports' },
-  ],
-  admin: [
-    { label: 'Dashboard', to: '/dashboard' },
-    { label: 'Product', to: '/products' },
-    { label: 'Warehouses', to: '/admin/warehouses' },
-    { label: 'Discount Config', to: '/admin/discount-config' },
-    { label: 'Reports', to: '/reports' },
-    { label: 'Audit Log', to: '/admin/audit-log' },
-  ],
-}
+const NAV_ITEMS = [
+  { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Quotations', to: '/quotations' },
+  { label: 'Approvals', to: '/approvals' },
+  { label: 'Fulfillment', to: '/fulfillment' },
+  { label: 'Subscriptions', to: '/subscriptions' },
+  { label: 'Invoices', to: '/invoices' },
+  { label: 'Deal Health', to: '/deal-health' },
+  { label: 'Reports', to: '/reports' },
+  { label: 'Product', to: '/products' },
+  { label: 'Discount Config', to: '/admin/discount-config', adminOnly: true },
+]
 
 export default function Layout({ children }) {
   const { user, logout, isCustomer } = useAuth()
   const navigate = useNavigate()
-  const navItems = NAV_BY_ROLE[user?.role] || NAV_BY_ROLE.sales_rep
+  const [isNavOpen, setIsNavOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setIsNavOpen(false)
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [])
+
   return (
     <div className="app-shell">
       {!isCustomer && (
         <header className="top-nav">
-          <span className="brand">DealFlow360</span>
-          <nav className="nav-links">
-            {navItems.map((item) => (
+          <button
+            className={`nav-toggle${isNavOpen ? ' open' : ''}`}
+            type="button"
+            aria-label={isNavOpen ? 'Close navigation' : 'Open navigation'}
+            aria-expanded={isNavOpen}
+            onClick={() => setIsNavOpen((open) => !open)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <button
+            className="brand"
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded={isNavOpen}
+            onClick={() => setIsNavOpen((open) => !open)}
+          >
+            DealFlow360
+          </button>
+          <nav className={`nav-links${isNavOpen ? ' open' : ''}`}>
+            {NAV_ITEMS.filter((item) => !item.adminOnly || user?.role === 'admin').map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) => (isActive ? 'active' : '')}
+                onClick={() => setIsNavOpen(false)}
               >
                 {item.label}
               </NavLink>
             ))}
           </nav>
           <div className="nav-right">
-            {user && <span>{user.name || user.email} · {user.role}</span>}
+            <button className="nav-icon-btn" type="button" aria-label="Notifications" onClick={() => navigate('/deal-health')}>
+              <i className="fa-regular fa-bell" aria-hidden="true" />
+              <span className="notification-dot">3</span>
+            </button>
+            {user && (
+              <div className="nav-user">
+                <span className="nav-avatar">{(user.name || user.email || 'U').charAt(0).toUpperCase()}</span>
+                <span className="nav-user-copy">
+                  <strong>{user.name || user.email}</strong>
+                  <small>{user.role?.replace('_', ' ')}</small>
+                </span>
+                <i className="fa-solid fa-chevron-down nav-chevron" aria-hidden="true" />
+              </div>
+            )}
             <button className="logout-btn" onClick={handleLogout}>Log Out</button>
           </div>
+          <button
+            className={`nav-backdrop${isNavOpen ? ' visible' : ''}`}
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setIsNavOpen(false)}
+          />
         </header>
       )}
       <main className="page">{children}</main>

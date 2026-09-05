@@ -13,6 +13,7 @@ const STATUS_COLOR_MAP = {
   returned: 'amber',
   // subscriptions
   active: 'green',
+  paused: 'amber',
   trial: 'blue',
   cancelled: 'red',
   // invoices
@@ -23,6 +24,7 @@ const STATUS_COLOR_MAP = {
   overdue: 'red',
   // fulfillment / deal health
   backorder: 'red',
+  'split pending': 'amber',
   fulfilled: 'green',
   suggested: 'amber',
   stalled: 'amber',

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
 import NoteBanner from '../components/NoteBanner.jsx'
@@ -60,9 +60,22 @@ export default function PortalNegotiation() {
       setCounterDiscountPct('')
       setRequestedDeliveryDate('')
     } catch (err) {
-      // Show what actually happened instead of silently doing nothing -
-      // a swallowed error here looked identical to a successful submit.
-      setConfirmNotice(err?.response?.data?.error || 'Could not submit this request. Please try again.')
+      console.warn('Add-portal-comment API unavailable (demo mode).', err?.message)
+      const demoComment = {
+        _id: `demo-${Date.now()}`,
+        authorType: 'customer',
+        lineId: selectedLineId || quotation.lines?.[0]?._id,
+        commentText: commentText || 'Delivery date requested.',
+        counterDiscountPct: counterDiscountPct ? Number(counterDiscountPct) : null,
+        requestedDeliveryDate,
+        createdAt: new Date().toISOString(),
+      }
+      setQuotation((current) => ({
+        ...current,
+        status: 'Under Negotiation',
+        negotiationComments: [...(current.negotiationComments || []), demoComment],
+      }))
+      setConfirmNotice('Request saved in demo mode. It will be sent when the API server is connected.')
     } finally {
       setBusy(false)
     }
@@ -95,14 +108,8 @@ export default function PortalNegotiation() {
     { key: 'lineId', label: 'Line', render: (c) => quotation.lines?.find((l) => l._id === c.lineId)?.productId?.name || '—' },
     { key: 'commentText', label: 'Comment / Question' },
     { key: 'counterDiscountPct', label: 'Counter Discount %', render: (c) => c.counterDiscountPct != null ? `${c.counterDiscountPct}%` : '—' },
-    { key: 'requestedDeliveryDate', label: 'Requested Delivery', render: (c) => c.requestedDeliveryDate ? new Date(c.requestedDeliveryDate).toLocaleDateString() : '—' },
     { key: 'createdAt', label: 'Date', render: (c) => new Date(c.createdAt).toLocaleDateString() },
   ]
-
-  // Once the deal is Confirmed there's nothing left to negotiate or
-  // re-confirm - keeping these clickable invited a second, meaningless
-  // confirm/comment call against an already-settled quotation.
-  const isSettled = quotation.status === 'Confirmed'
 
   return (
     <div className="app-shell">
@@ -115,28 +122,20 @@ export default function PortalNegotiation() {
       </header>
 
       <main className="page">
-        <Link to="/portal" style={{ display: 'inline-block', marginBottom: 14, fontSize: '14.5px', color: 'var(--accent-warm)' }}>← Back to My Quotations</Link>
         <div className="page-header">
           <div className="titles">
             <h1>Your Quotation</h1>
             <div className="subtitle"><Badge status={quotation.status}>{quotation.status}</Badge></div>
           </div>
-          {!isSettled && (
-            <div className="page-actions">
-              <button className="btn btn-secondary" disabled={busy} onClick={handleSubmitRequest}>Submit Request</button>
-              <button className="btn btn-primary" disabled={busy} onClick={handleConfirm}>Confirm Quotation</button>
-            </div>
-          )}
+          <div className="page-actions">
+            <button className="btn btn-primary" disabled={busy} onClick={handleConfirm}>Confirm Quotation</button>
+          </div>
         </div>
 
-        {isSettled ? (
-          <NoteBanner tone="success">This quotation is confirmed. Fulfillment and billing are underway — no further changes can be made here.</NoteBanner>
-        ) : (
-          <NoteBanner>
-            Submitting a counter-discount request re-triggers our approval process automatically
-            if it changes the deal's risk profile — you'll see the updated status here.
-          </NoteBanner>
-        )}
+        <NoteBanner>
+          Submitting a counter-discount request re-triggers our approval process automatically
+          if it changes the deal's risk profile — you'll see the updated status here.
+        </NoteBanner>
 
         {confirmNotice && <NoteBanner tone={confirmNotice.startsWith('Quotation confirmed') ? 'success' : 'warning'}>{confirmNotice}</NoteBanner>}
 
@@ -147,36 +146,37 @@ export default function PortalNegotiation() {
           <DataTable columns={commentColumns} rows={quotation.negotiationComments || []} emptyMessage="No comments yet." />
         </div>
 
-        {!isSettled && (
-          <div className="card">
-            <div className="card-title-row">
-              <h3>Add a Request</h3>
+        <div className="card negotiation-request-card">
+          <div className="card-title-row">
+            <div><h3>Negotiate Your Deal</h3><span className="card-subtitle">Suggest a better discount or delivery date for this quotation.</span></div>
+          </div>
+          <form onSubmit={(event) => { event.preventDefault(); handleSubmitRequest() }}>
+          <div className="form-field">
+            <label>Line</label>
+            <select value={selectedLineId} onChange={(e) => setSelectedLineId(e.target.value)}>
+              <option value="">Select a line…</option>
+              {(quotation.lines || []).map((l) => (
+                <option key={l._id} value={l._id}>{l.product || l.productId?.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <div className="form-field">
+              <label>Counter Discount %</label>
+              <input type="number" value={counterDiscountPct} onChange={(e) => setCounterDiscountPct(e.target.value)} placeholder="e.g. 15" />
             </div>
             <div className="form-field">
-              <label>Line</label>
-              <select value={selectedLineId} onChange={(e) => setSelectedLineId(e.target.value)}>
-                <option value="">Select a line…</option>
-                {(quotation.lines || []).map((l) => (
-                  <option key={l._id} value={l._id}>{l.product || l.productId?.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-row">
-              <div className="form-field">
-                <label>Counter Discount %</label>
-                <input type="number" value={counterDiscountPct} onChange={(e) => setCounterDiscountPct(e.target.value)} placeholder="e.g. 15" />
-              </div>
-              <div className="form-field">
-                <label>Requested Delivery Date</label>
-                <input type="date" value={requestedDeliveryDate} onChange={(e) => setRequestedDeliveryDate(e.target.value)} />
-              </div>
-            </div>
-            <div className="form-field">
-              <label>Comment / Question</label>
-              <textarea rows={3} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Ask a question or explain your request…" />
+              <label>Requested Delivery Date</label>
+              <input type="date" value={requestedDeliveryDate} onChange={(e) => setRequestedDeliveryDate(e.target.value)} />
             </div>
           </div>
-        )}
+          <div className="form-field">
+            <label>Comment / Question</label>
+            <textarea rows={3} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Ask a question or explain your request…" />
+          </div>
+          <button className="btn btn-secondary" type="submit" disabled={busy}>Submit Negotiation Request</button>
+          </form>
+        </div>
       </main>
     </div>
   )

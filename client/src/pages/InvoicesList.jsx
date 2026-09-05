@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
+import StatCard from '../components/StatCard.jsx'
 import { getInvoices } from '../api/invoices.js'
 import { mockInvoices } from '../mockData.js'
 
@@ -14,9 +15,9 @@ export default function InvoicesList() {
     async function load() {
       try {
         const res = await getInvoices()
-        const mapped = (res.data || []).map((inv) => ({
+        const mapped = (res.data || []).map((inv, index) => ({
           _id: inv._id,
-          number: inv.number || inv._id,
+          number: inv.number || `Invoice ${index + 1}`,
           customer: inv.customerId?.name || inv.customer,
           amount: inv.amount,
           status: inv.status,
@@ -41,6 +42,9 @@ export default function InvoicesList() {
     { key: 'dueDate', label: 'Due Date', render: (r) => r.dueDate ? new Date(r.dueDate).toLocaleDateString() : '—' },
   ]
 
+  const paidCount = invoices.filter((invoice) => invoice.status?.toLowerCase() === 'paid').length
+  const unpaidCount = invoices.filter((invoice) => ['unpaid', 'sent', 'partially paid', 'overdue'].includes(invoice.status?.toLowerCase())).length
+
   return (
     <div>
       <div className="page-header">
@@ -50,7 +54,15 @@ export default function InvoicesList() {
         </div>
       </div>
 
+      <div className="stat-grid invoice-status-grid">
+        <StatCard label="Paid" value={paidCount} accent="green" icon="fa-solid fa-circle-check" sub="Paid invoices" />
+        <StatCard label="Unpaid" value={unpaidCount} accent="red" icon="fa-solid fa-circle-exclamation" sub="Outstanding invoices" />
+      </div>
+
       <div className="card">
+        <div className="card-title-row">
+          <div><h3>Invoice List</h3><span className="card-subtitle">Click an invoice to open payment and reconciliation detail.</span></div>
+        </div>
         <DataTable columns={columns} rows={invoices} onRowClick={(r) => navigate(`/invoices/${r._id}`)} />
       </div>
     </div>

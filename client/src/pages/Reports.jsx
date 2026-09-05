@@ -3,7 +3,12 @@ import StatCard from '../components/StatCard.jsx'
 import { getReports } from '../api/reports.js'
 import { getUsers } from '../api/users.js'
 import { getProducts } from '../api/products.js'
-import { mockReports } from '../mockData.js'
+import { mockReports, mockProducts, mockQuotations } from '../mockData.js'
+
+const mockReps = [
+  { _id: 'u1', name: 'Priya Nair', role: 'sales_rep' },
+  { _id: 'u2', name: 'Jordan Lee', role: 'sales_rep' },
+]
 
 function downloadFile(filename, content, mime) {
   const blob = new Blob([content], { type: mime })
@@ -31,12 +36,14 @@ export default function Reports() {
         if (!cancelled) setReps((res.data || []).filter((u) => u.role === 'sales_rep'))
       } catch (err) {
         console.warn('Rep list unavailable for filter.', err?.message)
+        if (!cancelled) setReps(mockReps)
       }
       try {
         const res = await getProducts()
         if (!cancelled) setProducts(res.data || [])
       } catch (err) {
         console.warn('Product list unavailable for filter.', err?.message)
+        if (!cancelled) setProducts(mockProducts)
       }
     }
     loadOptions()
@@ -51,7 +58,7 @@ export default function Reports() {
         if (!cancelled) setReport(res.data)
       } catch (err) {
         console.warn('Falling back to mock reports data.', err?.message)
-        if (!cancelled) setReport(mockReports)
+        if (!cancelled) setReport({ ...mockReports, quotations: mockQuotations })
       }
     }
     load()
@@ -60,9 +67,21 @@ export default function Reports() {
   }, [filters])
 
   const update = (field) => (e) => setFilters((f) => ({ ...f, [field]: e.target.value }))
+  const reportQuotations = report.quotations || mockQuotations
+  const netRevenue = report.netRevenue != null
+    ? Number(report.netRevenue)
+    : reportQuotations.reduce((sum, quotation) => {
+      if (quotation.amount != null) return sum + (Number(quotation.amount) || 0)
+      return sum + (quotation.lines || []).reduce((lineSum, line) => {
+        const quantity = Number(line.quantity) || 0
+        const unitPrice = Number(line.unitPrice) || 0
+        const discount = (Number(line.discountPct) || 0) / 100
+        return lineSum + quantity * unitPrice * (1 - discount)
+      }, 0)
+    }, 0)
 
   const handleExportXls = () => {
-    const rows = report.quotations || []
+    const rows = report.quotations || mockQuotations
     const header = 'Quotation,Customer,Status,Blended Risk Score,Created'
     const lines = rows.map((q) => [
       q._id,
@@ -119,7 +138,8 @@ export default function Reports() {
 
       <div className="stat-grid">
         <StatCard label="Quotes Created" value={report.quotesCreated} />
-        <StatCard label="Avg Approval Time" value={report.avgApprovalTime != null ? `${report.avgApprovalTime}h` : '—'} />
+        <StatCard label="Net Revenue" value={`$${netRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} accent="blue" sub={`${reportQuotations.length} quotation records`} />
+        <StatCard label="Avg Approval Time" value={report.avgApprovalTime != null ? String(report.avgApprovalTime).replace(/\s*h(?:rs?)?$/i, ' hrs') : '—'} />
         <StatCard label="Top Upsold Product" value={report.topUpsoldProduct} />
       </div>
     </div>

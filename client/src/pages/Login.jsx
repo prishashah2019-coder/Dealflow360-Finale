@@ -4,10 +4,10 @@ import { login as loginApi, signup as signupApi, customerSignup as customerSignu
 import { useAuth } from '../context/AuthContext.jsx'
 
 const FEATURES = [
-  { icon: '🛡️', title: 'Discount governance', text: 'Every line is checked against its own tier and category limit, with automatic approval routing.' },
-  { icon: '📦', title: 'Multi-warehouse fulfillment', text: 'Live stock splits orders across warehouses automatically, with manual override.' },
-  { icon: '🔁', title: 'Hybrid billing', text: 'One-time products and recurring subscriptions reconciled on a single order.' },
-  { icon: '💬', title: 'Customer negotiation portal', text: 'Customers counter-offer directly - terms beyond threshold re-enter approval automatically.' },
+  { icon: 'fa-solid fa-shield', title: 'Discount governance', text: 'Every line is checked against its own tier and category limit, with automatic approval routing.' },
+  { icon: 'fa-solid fa-box', title: 'Multi-warehouse fulfillment', text: 'Live stock splits orders across warehouses automatically, with manual override.' },
+  { icon: 'fa-solid fa-repeat', title: 'Hybrid billing', text: 'One-time products and recurring subscriptions reconciled on a single order.' },
+  { icon: 'fa-solid fa-comment', title: 'Customer negotiation portal', text: 'Customers counter-offer directly - terms beyond threshold re-enter approval automatically.' },
 ]
 
 const SIGNUP_ROLES = [
@@ -76,18 +76,14 @@ export default function Login() {
         <div className="landing-hero-content">
           <div className="landing-logo">DealFlow360</div>
           <h1>An intelligent, self-governing sales operations platform</h1>
-          <p className="landing-lede">
-            From quotation to cash: discount governance, live upsell suggestions,
-            multi-warehouse fulfillment, hybrid billing, and a real customer
-            negotiation portal - in one connected flow.
-          </p>
+          <br />
+          <br />
           <ul className="landing-features">
             {FEATURES.map((f) => (
               <li key={f.title}>
-                <span className="ico">{f.icon}</span>
+                <span className="ico" aria-hidden="true"><i className={f.icon} /></span>
                 <div>
                   <div className="ft-title">{f.title}</div>
-                  <div className="ft-text">{f.text}</div>
                 </div>
               </li>
             ))}
@@ -111,7 +107,7 @@ export default function Login() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form key={tab} className="auth-form" onSubmit={handleSubmit}>
               {tab === 'signup' && (
                 <div className="form-field">
                   <label>Name</label>

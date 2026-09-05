@@ -98,6 +98,28 @@ async function updateQuotation(req, res) {
   res.json(quotation);
 }
 
+async function addNegotiationComment(req, res) {
+  const quotation = await Quotation.findById(req.params.id);
+  if (!quotation) return res.status(404).json({ error: 'Not found' });
+  if (['Confirmed', 'Rejected'].includes(quotation.status)) {
+    return res.status(400).json({ error: 'Closed quotations cannot be negotiated.' });
+  }
+  const { lineId, commentText, counterDiscountPct, requestedDeliveryDate } = req.body;
+  if (!commentText && counterDiscountPct == null && !requestedDeliveryDate) {
+    return res.status(400).json({ error: 'Add a message, discount, or delivery date.' });
+  }
+  if (counterDiscountPct != null && (Number(counterDiscountPct) < 0 || Number(counterDiscountPct) > 100)) {
+    return res.status(400).json({ error: 'Discount must be between 0 and 100.' });
+  }
+  if (lineId && !quotation.lines.id(lineId)) return res.status(400).json({ error: 'Line does not belong to this quotation.' });
+  quotation.negotiationComments.push({ authorType: 'rep', lineId: lineId || null, commentText: commentText || '', counterDiscountPct, requestedDeliveryDate });
+  if (counterDiscountPct != null && lineId) quotation.lines.id(lineId).discountPct = Number(counterDiscountPct);
+  quotation.status = 'Under Negotiation';
+  await quotation.save();
+  await log(quotation._id, 'negotiation_response', req.auth.sub, commentText || 'Updated negotiated terms');
+  res.status(201).json(quotation);
+}
+
 async function submitForApproval(req, res) {
   const quotation = await Quotation.findById(req.params.id);
   if (!quotation) return res.status(404).json({ error: 'Not found' });
@@ -219,6 +241,7 @@ async function confirmQuotation(req, res) {
 
 module.exports = {
   listQuotations, createQuotation, getQuotation, updateQuotation,
+  addNegotiationComment,
   submitForApproval, decideApprovalStep,
   suggestFulfillment, acceptFulfillment, overrideFulfillment,
   confirmQuotation,

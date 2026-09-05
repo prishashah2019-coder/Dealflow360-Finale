@@ -2,6 +2,8 @@ import client from './client'
 
 // GET /api/products
 export const getProducts = () => client.get('/products')
+// GET /api/customers
+export const getCustomers = () => client.get('/customers')
 // POST /api/products
 export const createProduct = (data) => client.post('/products', data)
 // GET /api/products/:id

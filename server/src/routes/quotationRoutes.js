@@ -9,6 +9,7 @@ router.get('/', ctrl.listQuotations);
 router.post('/', ctrl.createQuotation);
 router.get('/:id', ctrl.getQuotation);
 router.put('/:id', ctrl.updateQuotation);
+router.post('/:id/negotiation/comments', ctrl.addNegotiationComment);
 router.post('/:id/submit-for-approval', ctrl.submitForApproval);
 router.post('/:id/approvals/:stepId/decide', ctrl.decideApprovalStep);
 router.post('/:id/fulfillment/suggest', ctrl.suggestFulfillment);

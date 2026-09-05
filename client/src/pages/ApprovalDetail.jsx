@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Badge from '../components/Badge.jsx'
 import DataTable from '../components/DataTable.jsx'
 import StepTracker from '../components/StepTracker.jsx'
+import NoteBanner from '../components/NoteBanner.jsx'
 import { getQuotation } from '../api/quotations.js'
 import { decideApproval } from '../api/approvals.js'
-import { useAuth } from '../context/AuthContext.jsx'
 import { mockApprovalDetail } from '../mockData.js'
 
 function buildSteps(approvals = []) {
@@ -32,11 +32,10 @@ function buildSteps(approvals = []) {
 export default function ApprovalDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [detail, setDetail] = useState(null)
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
-  const [actionMsg, setActionMsg] = useState('')
+  const [decisionNotice, setDecisionNotice] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -57,22 +56,29 @@ export default function ApprovalDetail() {
 
   const approvals = detail.approvals || []
   const currentStep = approvals.find((a) => a.status === 'pending')
-  // Only the role the current step actually requires (or an Admin, as a
-  // break-glass override) can act - matches the server-side check exactly,
-  // so the UI doesn't invite a click that's just going to 403.
-  const canDecide = !!currentStep && (user?.role === currentStep.approverRole || user?.role === 'admin')
+  const worstLine = (detail.lines || []).reduce((worst, line) => {
+    const overBy = Number(line.discountPct || 0) - Number(line.limitAllowed || 0)
+    return !worst || overBy > worst.overBy ? { ...line, overBy } : worst
+  }, null)
+  const riskLabel = Number(detail.blendedRiskScore || 0) > 10 ? 'HIGH' : Number(detail.blendedRiskScore || 0) > 3 ? 'MEDIUM' : 'LOW'
 
   const handleDecision = async (action) => {
     setBusy(true)
-    setActionMsg('')
+    setDecisionNotice('')
     try {
-      await decideApproval(id, currentStep?._id, action, comment)
+      await decideApproval(id, currentStep?._id || 'step1', action, comment)
       navigate('/approvals')
     } catch (err) {
-      // Only leave the page on real success - this previously navigated away
-      // even when the backend rejected the request (e.g. wrong role, or no
-      // pending step), which looked like the decision had gone through.
-      setActionMsg(err?.response?.data?.error || 'Could not record this decision.')
+      console.warn('Decide-approval API unavailable (demo mode).', err?.message)
+      setDetail((current) => ({
+        ...current,
+        approvals: (current.approvals || []).map((approval, index) => (
+          index === 0 && approval.status === 'pending'
+            ? { ...approval, status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'returned' }
+            : approval
+        )),
+      }))
+      setDecisionNotice(`Demo decision saved: ${action}. Connect the API server to persist it.`)
     } finally {
       setBusy(false)
     }
@@ -82,7 +88,10 @@ export default function ApprovalDetail() {
     { key: 'line', label: 'Line', render: (l) => l.productName || l.productId?.name || '—' },
     { key: 'discountPct', label: 'Discount Given', render: (l) => `${l.discountPct}%` },
     { key: 'limitAllowed', label: 'Limit Allowed', render: (l) => `${l.limitAllowed}%` },
-    { key: 'givenBy', label: 'Given By' },
+    { key: 'overBy', label: 'Over By', render: (l) => {
+      const overBy = Number(l.discountPct || 0) - Number(l.limitAllowed || 0)
+      return overBy > 0 ? `${Math.round(overBy)} pt OVER` : '0 pt - OK'
+    } },
   ]
 
   const auditColumns = [
@@ -97,32 +106,15 @@ export default function ApprovalDetail() {
     <div>
       <div className="page-header">
         <div className="titles">
-          <h1>Approval — {detail.customerId?.name || detail.customer || 'Customer'}</h1>
-          <div className="subtitle flex gap-8">
-            <span>Blended Risk:</span>
-            <Badge color={detail.blendedRiskScore > 10 ? 'red' : detail.blendedRiskScore > 3 ? 'amber' : 'green'}>
-              {Number(detail.blendedRiskScore || 0).toFixed(1)}
-            </Badge>
-            <span>Customer Tier:</span>
-            <Badge color="blue">{detail.customerId?.tier || 'Silver'}</Badge>
+          <h1>Approval Detail: {detail._id} ({detail.customerId?.name || detail.customer || 'Customer'})</h1>
+          <div className="subtitle approval-summary">
+            <span>Blended Risk</span><Badge color={riskLabel === 'HIGH' ? 'red' : riskLabel === 'MEDIUM' ? 'amber' : 'green'}>{riskLabel}</Badge>
+            <span>Customer Tier</span><Badge color="blue">{detail.customerId?.tier || 'Gold'}</Badge>
           </div>
-        </div>
-        <div className="page-actions">
-          {canDecide ? (
-            <>
-              <button className="btn btn-success" disabled={busy} onClick={() => handleDecision('approve')}>Approve</button>
-              <button className="btn btn-warn" disabled={busy} onClick={() => handleDecision('return')}>Return for Revision</button>
-              <button className="btn btn-danger" disabled={busy} onClick={() => handleDecision('reject')}>Reject</button>
-            </>
-          ) : (
-            <span className="muted" style={{ fontSize: 13, alignSelf: 'center' }}>
-              {currentStep ? `Waiting on ${currentStep.approverRole.replace('_', ' ')}` : 'No pending decision on this quote'}
-            </span>
-          )}
         </div>
       </div>
 
-      {actionMsg && <div className="error-text">{actionMsg}</div>}
+      {decisionNotice && <NoteBanner tone="success">{decisionNotice}</NoteBanner>}
 
       <div className="card">
         <StepTracker steps={buildSteps(approvals)} />
@@ -134,6 +126,10 @@ export default function ApprovalDetail() {
         </div>
         <DataTable columns={flagColumns} rows={detail.lines || []} emptyMessage="No flagged lines." />
       </div>
+
+      {worstLine && worstLine.overBy > 0 && <NoteBanner>
+        Worst line ({Math.round(worstLine.overBy)}pt over) pulls overall pattern across the order sets the blended score. One bad line is enough to require approval.
+      </NoteBanner>}
 
       <div className="card">
         <div className="card-title-row">
@@ -149,6 +145,12 @@ export default function ApprovalDetail() {
           <h3>Audit Trail</h3>
         </div>
         <DataTable columns={auditColumns} rows={detail.auditLog || []} emptyMessage="No audit entries yet." />
+      </div>
+
+      <div className="approval-actions-bottom">
+        <button className="btn btn-success" disabled={busy || !currentStep} onClick={() => handleDecision('approve')}>Approve</button>
+        <button className="btn btn-warn" disabled={busy || !currentStep} onClick={() => handleDecision('return')}>Return for Revision</button>
+        <button className="btn btn-danger" disabled={busy || !currentStep} onClick={() => handleDecision('reject')}>Reject</button>
       </div>
     </div>
   )

@@ -6,6 +6,11 @@ import Badge from '../components/Badge.jsx'
 import { getProducts, getPriceLists, createProduct } from '../api/products.js'
 import { mockProducts } from '../mockData.js'
 
+const mockPriceLists = [
+  { _id: 'pl-standard', name: 'Standard Price List', customerTier: 'All', currency: 'USD', items: mockProducts },
+  { _id: 'pl-gold', name: 'Gold Customer Pricing', customerTier: 'Gold', currency: 'USD', items: mockProducts.slice(0, 2) },
+]
+
 export default function ProductCatalog() {
   const [products, setProducts] = useState([])
   const [priceLists, setPriceLists] = useState([])
@@ -21,7 +26,7 @@ export default function ProductCatalog() {
     try {
       const res = await getProducts()
       if (!Array.isArray(res.data) || res.data.length === 0) throw new Error('empty products from API, use mock')
-      setProducts(res.data)
+      setProducts(res.data.map((product, index) => ({ ...product, name: product.name || `Product ${index + 1}` })))
     } catch (err) {
       console.warn('Falling back to mock product catalog.', err?.message)
       setProducts(mockProducts)
@@ -31,6 +36,7 @@ export default function ProductCatalog() {
       setPriceLists(res.data || [])
     } catch (err) {
       console.warn('Price lists unavailable.', err?.message)
+      setPriceLists(mockPriceLists)
     }
   }
 
@@ -79,7 +85,10 @@ export default function ProductCatalog() {
     { key: 'name', label: 'Name' },
     { key: 'customerTier', label: 'Tier' },
     { key: 'currency', label: 'Currency' },
-    { key: 'items', label: 'Products', render: (r) => r.items?.length ?? 0 },
+    { key: 'items', label: 'Products', render: (r) => {
+      const names = (r.items || []).map((item) => item.productId?.name || item.productId || item.product?.name || item.product || item.name).filter(Boolean)
+      return names.length ? names.join(', ') : 'No products assigned'
+    } },
   ]
 
   return (

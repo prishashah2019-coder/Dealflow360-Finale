@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
+import StatCard from '../components/StatCard.jsx'
 import { getSubscriptions } from '../api/subscriptions.js'
 import { createSubscriptionPlan } from '../api/products.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -63,6 +64,10 @@ export default function SubscriptionsList() {
     { key: 'status', label: 'Status', render: (r) => <Badge status={r.status}>{r.status}</Badge> },
   ]
 
+  const activeCount = subs.filter((subscription) => subscription.status?.toLowerCase() === 'active').length
+  const pausedCount = subs.filter((subscription) => subscription.status?.toLowerCase() === 'paused').length
+  const cancelledCount = subs.filter((subscription) => ['cancelled', 'canceled'].includes(subscription.status?.toLowerCase())).length
+
   return (
     <div>
       <div className="page-header">
@@ -103,7 +108,16 @@ export default function SubscriptionsList() {
         </div>
       )}
 
+      <div className="stat-grid subscription-status-grid">
+        <StatCard label="Active" value={activeCount} accent="green" icon="fa-solid fa-circle-check" sub="Live subscriptions" />
+        <StatCard label="Paused" value={pausedCount} accent="amber" icon="fa-solid fa-circle-pause" sub="Temporarily paused" />
+        <StatCard label="Canceled" value={cancelledCount} accent="red" icon="fa-solid fa-circle-xmark" sub="Ended subscriptions" />
+      </div>
+
       <div className="card">
+        <div className="card-title-row">
+          <div><h3>Subscription List</h3><span className="card-subtitle">Click any subscription to open its billing detail.</span></div>
+        </div>
         <DataTable columns={columns} rows={subs} onRowClick={(r) => navigate(`/subscriptions/${r._id}`)} />
       </div>
     </div>
