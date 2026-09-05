@@ -1,9 +1,19 @@
 import { useEffect, useState } from 'react'
 import StatCard from '../components/StatCard.jsx'
+import PieChart from '../components/PieChart.jsx'
 import { getReports } from '../api/reports.js'
 import { getUsers } from '../api/users.js'
 import { getProducts } from '../api/products.js'
 import { mockReports, mockProducts, mockQuotations } from '../mockData.js'
+
+const STATUS_COLORS = {
+  'Draft': '#6f6559',
+  'Pending Approval': '#b45309',
+  'Approved': '#3d5a80',
+  'Under Negotiation': '#b5652f',
+  'Confirmed': '#16a34a',
+  'Rejected': '#b3401f',
+}
 
 const mockReps = [
   { _id: 'u1', name: 'Priya Nair', role: 'sales_rep' },
@@ -68,6 +78,14 @@ export default function Reports() {
 
   const update = (field) => (e) => setFilters((f) => ({ ...f, [field]: e.target.value }))
   const reportQuotations = report.quotations || mockQuotations
+
+  // Prefer the server's real per-status counts; only derive from the visible
+  // quotation rows (e.g. when running on mock data) if the API didn't send one.
+  const statusBreakdown = report.statusBreakdown || Object.keys(STATUS_COLORS).map((label) => ({
+    label,
+    value: reportQuotations.filter((q) => q.status === label).length,
+  }))
+  const pieData = statusBreakdown.map((s) => ({ ...s, color: STATUS_COLORS[s.label] || '#6f6559' }))
   const netRevenue = report.netRevenue != null
     ? Number(report.netRevenue)
     : reportQuotations.reduce((sum, quotation) => {
@@ -141,6 +159,13 @@ export default function Reports() {
         <StatCard label="Net Revenue" value={`$${netRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} accent="blue" sub={`${reportQuotations.length} quotation records`} />
         <StatCard label="Avg Approval Time" value={report.avgApprovalTime != null ? String(report.avgApprovalTime).replace(/\s*h(?:rs?)?$/i, ' hrs') : '—'} />
         <StatCard label="Top Upsold Product" value={report.topUpsoldProduct} />
+      </div>
+
+      <div className="card">
+        <div className="card-title-row">
+          <div><h3>Pipeline by Stage</h3><span className="card-subtitle">Every quotation in the current filter, broken down by status.</span></div>
+        </div>
+        <PieChart data={pieData} emptyMessage="No quotations match these filters yet." />
       </div>
     </div>
   )

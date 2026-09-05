@@ -19,6 +19,15 @@ async function getReports(req, res) {
 
   const quotesCreated = quotations.length;
 
+  // Pipeline-stage breakdown for the Reports pie chart - always includes
+  // every status (even at 0) so the chart/legend never silently drops a
+  // stage just because nothing currently sits in it.
+  const STATUSES = ['Draft', 'Pending Approval', 'Approved', 'Under Negotiation', 'Confirmed', 'Rejected'];
+  const statusBreakdown = STATUSES.map((label) => ({
+    label,
+    value: quotations.filter((q) => q.status === label).length,
+  }));
+
   const approvalDurationsMs = [];
   for (const q of quotations) {
     const decided = q.approvals.filter((a) => a.decidedAt);
@@ -49,6 +58,7 @@ async function getReports(req, res) {
     quotesCreated,
     avgApprovalTime: Math.round(avgApprovalTimeHours * 10) / 10, // hours
     topUpsoldProduct: topProduct ? `${topProduct.name} (${topCount} units)` : '—',
+    statusBreakdown,
     quotations,
   });
 }

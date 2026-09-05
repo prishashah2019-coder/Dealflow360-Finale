@@ -1775,3 +1775,67 @@ table.data-table tbody tr:last-child td {
   font-size: 15.5px;
   font-weight: 600;
 }
+
+/* ---------- Pie / donut chart (Reports) ---------- */
+
+.piechart-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.piechart-body {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.piechart-svg { flex-shrink: 0; }
+
+.piechart-total-value {
+  font-size: 28px;
+  font-weight: 700;
+  fill: var(--text);
+  font-family: var(--font-body);
+}
+
+.piechart-total-label {
+  font-size: 11px;
+  fill: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.piechart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.piechart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.piechart-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.piechart-legend-label { flex: 1; color: var(--text); }
+.piechart-legend-value { font-weight: 700; }
+.piechart-legend-pct { color: var(--text-muted); width: 40px; text-align: right; }
+
+@media (max-width: 560px) {
+  .piechart-body { flex-direction: column; align-items: flex-start; }
+}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Kanban from '../components/Kanban.jsx'
 import DataTable from '../components/DataTable.jsx'
 import Badge from '../components/Badge.jsx'
+import StatCard from '../components/StatCard.jsx'
 import { getQuotations, createQuotation } from '../api/quotations.js'
 import { getCustomers, getProducts } from '../api/products.js'
 import { mockQuotations } from '../mockData.js'
@@ -75,6 +76,14 @@ export default function QuotationsList() {
     })
     return byCol
   }, [quotations])
+
+  // Kanban already shows a per-column count, but that disappears in Table
+  // view - this stat row keeps the Draft/Pending/Approved/Negotiation/
+  // Confirmed breakdown visible regardless of which view is active.
+  const statusCounts = useMemo(
+    () => COLUMNS.map((c) => ({ ...c, count: cardsByColumn[c.key]?.length || 0 })),
+    [cardsByColumn]
+  )
 
   const handleNewQuotation = () => {
     setShowCreate((current) => !current)
@@ -158,6 +167,17 @@ export default function QuotationsList() {
             Switch to {view === 'kanban' ? 'Table' : 'Kanban'} View
           </button>
         </div>
+      </div>
+
+      <div className="stat-grid">
+        {statusCounts.map((c) => (
+          <StatCard
+            key={c.key}
+            label={c.label}
+            value={c.count}
+            accent={{ 'Pending Approval': 'amber', Approved: 'green', 'Under Negotiation': 'blue', Confirmed: 'green' }[c.key]}
+          />
+        ))}
       </div>
 
       {showCreate && <div className="card quotation-create-card">

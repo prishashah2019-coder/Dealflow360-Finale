@@ -20,7 +20,11 @@ const approvalStepSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const fulfillmentSplitSchema = new mongoose.Schema({
-  warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
+  // Backorder splits (isBackorder: true) genuinely have no warehouse yet -
+  // suggestFulfillmentSplit sets warehouseId: null for the uncovered
+  // remainder, so this can't be required or every real backorder fails
+  // quotation.save() with a validation error.
+  warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', default: null },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   qtyFulfilled: { type: Number, required: true },
   shipmentCost: { type: Number, default: 0 },
