@@ -56,6 +56,13 @@ export default function DealHealth() {
       console.warn(`${kind} API unavailable (demo mode).`, err?.message)
       setActionNotice(`${kind === 'nudge' ? 'Rep nudged' : 'Deal escalated'} in demo mode. Connect the API server to persist this action.`)
     } finally {
+      if (kind === 'escalate') {
+        setAlerts((currentAlerts) => currentAlerts.map((alert) => (
+          alert.quotationId === row.quotationId
+            ? { ...alert, action: 'escalated', issue: 'Escalated for follow-up' }
+            : alert
+        )))
+      }
       setBusyId(null)
     }
   }
@@ -73,7 +80,9 @@ export default function DealHealth() {
     { key: 'action', label: 'Type', render: (r) => <Badge status={r.action}>{r.action.replace('_', ' ')}</Badge> },
     { key: 'actions', label: 'Action', render: (r) => (
       <div className="flex gap-8">
-        <button className="btn btn-secondary btn-sm" disabled={busyId === r.quotationId + 'escalate'} onClick={() => handleAction(r, 'escalate')}>Escalate</button>
+        <button className="btn btn-secondary btn-sm" disabled={r.action === 'escalated' || busyId === r.quotationId + 'escalate'} onClick={() => handleAction(r, 'escalate')}>
+          {r.action === 'escalated' ? 'Escalated' : 'Escalate'}
+        </button>
         <button className="btn btn-secondary btn-sm" disabled={busyId === r.quotationId + 'nudge'} onClick={() => handleAction(r, 'nudge')}>Nudge Rep</button>
       </div>
     ) },

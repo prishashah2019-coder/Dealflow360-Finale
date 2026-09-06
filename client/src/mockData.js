@@ -216,9 +216,9 @@ export const mockInvoiceDetail = {
 }
 
 export const mockDealHealth = [
-  { deal: 'q1004', issue: 'Stalled 14 days', flagged: '2026-08-30', action: 'stalled' },
-  { deal: 'q1002', issue: 'Discount 18% vs rep avg 7%', flagged: '2026-08-29', action: 'discount_anomaly' },
-  { deal: 'q1009', issue: 'Shipment 6 days past expected date', flagged: '2026-08-27', action: 'delivery_slippage' },
+  { quotationId: 'q1004', deal: 'q1004', issue: 'Stalled 14 days', flagged: '2026-08-30', action: 'stalled' },
+  { quotationId: 'q1002', deal: 'q1002', issue: 'Discount 18% vs rep avg 7%', flagged: '2026-08-29', action: 'discount_anomaly' },
+  { quotationId: 'q1009', deal: 'q1009', issue: 'Shipment 6 days past expected date', flagged: '2026-08-27', action: 'delivery_slippage' },
 ]
 
 export const mockReports = {
