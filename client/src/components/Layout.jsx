@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { PageSearchContext } from '../context/PageSearchContext.jsx'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', to: '/dashboard' },
@@ -19,6 +20,8 @@ export default function Layout({ children }) {
   const { user, logout, isCustomer } = useAuth()
   const navigate = useNavigate()
   const [isNavOpen, setIsNavOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const handleLogout = () => {
     logout()
@@ -71,6 +74,35 @@ export default function Layout({ children }) {
             ))}
           </nav>
           <div className="nav-right">
+            {searchOpen && (
+              <input
+                className="nav-search"
+                type="search"
+                value={searchQuery}
+                placeholder="Search this page"
+                aria-label="Search data on this page"
+                autoFocus
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setSearchQuery('')
+                    setSearchOpen(false)
+                  }
+                }}
+              />
+            )}
+            <button
+              className="nav-icon-btn nav-search-toggle"
+              type="button"
+              aria-label={searchOpen ? 'Close page search' : 'Search this page'}
+              aria-expanded={searchOpen}
+              onClick={() => {
+                setSearchOpen((open) => !open)
+                if (searchOpen) setSearchQuery('')
+              }}
+            >
+              <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+            </button>
             <button className="nav-icon-btn" type="button" aria-label="Notifications" onClick={() => navigate('/deal-health')}>
               <i className="fa-regular fa-bell" aria-hidden="true" />
               <span className="notification-dot">3</span>
@@ -95,7 +127,9 @@ export default function Layout({ children }) {
           />
         </header>
       )}
-      <main className="page">{children}</main>
+      <PageSearchContext.Provider value={searchQuery}>
+        <main className="page">{children}</main>
+      </PageSearchContext.Provider>
     </div>
   )
 }
